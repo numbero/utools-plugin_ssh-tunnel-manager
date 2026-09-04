@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SSH 隧道管理器</title>
+<link rel="stylesheet" href="css/style.css">
+<style>[v-cloak]{display:none!important}</style>
+</head>
+<body>
+<div id="app" v-cloak>
+
+  <!-- 环境警示 -->
+  <div class="banner" v-if="S.env.checked && S.env.sshMissing">
+    ⚠ 未检测到 ssh 可执行文件，无法建立隧道。<code>{{S.env.sshVersion || 'PATH 中无 ssh'}}</code>
+  </div>
+
+  <!-- 工具栏（仅列表视图） -->
+  <div class="toolbar" v-show="S.view==='list'">
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input v-model="S.query" placeholder="搜索隧道名称或主机…">
+    </div>
+    <button class="btn ghost sm" title="启动全部已停止隧道" @click="startAll">▶ 全部启动</button>
+    <button class="btn ghost sm" title="停止全部运行中隧道" @click="stopAll">■ 全部停止</button>
+    <button class="btn ghost sm" @click="importConfig">导入</button>
+    <button class="btn ghost sm" @click="exportConfig">导出</button>
+    <div class="divider"></div>
+    <button class="btn primary" @click="openForm(null)">＋ 新建隧道</button>
+  </div>
+
+  <div class="panel">
+
+    <!-- ============ 列表视图 ============ -->
+    <div class="view" v-if="S.view==='list'">
+      <div class="summary" v-if="S.tunnels.length">
+        <span><span class="dot" style="background:var(--green)"></span><b>{{counts.running}}</b> 运行中</span>
+        <span><span class="dot" style="background:var(--grey)"></span><b>{{counts.stopped}}</b> 已停止</span>
+        <span v-if="counts.connecting"><span class="dot" style="background:var(--amber)"></span><b>{{counts.connecting}}</b> 连接中</span>
+        <span v-if="counts.error"><span class="dot" style="background:var(--red)"></span><b>{{counts.error}}</b> 异常</span>
+        <span class="right">{{S.tunnels.length}} 条隧道<span v-if="S.env.sshVersion"> · {{S.env.sshVersion}}</span></span>
+      </div>
+
+      <div v-for="t in filtered" :key="t._id" class="card" :class="[st(t).status, S.expanded[t._id] ? 'open' : '']">
+        <div class="card-head" @click="toggleExpand(t._id)">
+          <span class="status-dot"></span>
+          <div class="card-id">
+            <div class="card-name">{{t.name}}
+              <span v-if="st(t).status==='running' && st(t).adopted" class="adopted-tag" title="该隧道由上次会话启动，已自动接管">常驻</span>
+            </div>
+            <div class="card-sub">{{t.user}}@{{t.host}}:{{t.port}} · {{enabledCount(t)}} 条启用规则</div>
+          </div>
+          <span class="chip" :class="st(t).status">
+            <span v-if="st(t).status==='starting'" class="spin"></span>{{statusText(st(t))}}<span v-if="st(t).status==='running'" class="up">{{uptime(t)}}</span>
+          </span>
+          <button class="icon-btn" style="border:0;background:transparent" title="更多" @click.stop="S.menuFor = S.menuFor===t._id ? null : t._id">
+            <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+          </button>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+        <div class="menu" v-if="S.menuFor===t._id" @click.stop>
+          <button @click="duplicateTunnel(t)">复制</button>
+          <button @click="moveTunnel(t,-1)">上移</button>
+          <button @click="moveTunnel(t,1)">下移</button>
+        </div>
+
+        <div class="card-body" v-show="S.expanded[t._id]">
+          <div class="err-banner" v-if="st(t).status==='error' && st(t).lastError">⚠ {{st(t).lastError}}</div>
+          <div class="rules">
+            <div class="rules-title">转发规则 · {{t.rules.length}} 条</div>
+            <div v-for="r in t.rules" :key="r.id" class="rule" :class="{off:!r.enabled}">
+              <span class="rchip" :class="r.type">{{typeLabel(r.type)}}</span>
+              <span class="map">{{ruleMapText(r)}}</span>
+              <label class="sw" :title="r.enabled?'停用该规则':'启用该规则'">
+                <input type="checkbox" :checked="r.enabled" @change="toggleRule(t,r,$event.target.checked)">
+                <span class="tr"></span><span class="kn"></span>
+              </label>
+            </div>
+          </div>
+          <div class="card-foot">
+            <button v-if="st(t).status==='starting'" class="btn sm" @click="stopTunnel(t)"><span class="spin"></span>&nbsp;取消连接</button>
+            <button v-else-if="st(t).status==='running'" class="btn sm" @click="stopTunnel(t)">■ 停止</button>
+            <button v-else class="btn sm primary" @click="startTunnel(t)">▶ 启动</button>
+            <button class="btn sm ghost" @click="openLog(t)">日志</button>
+            <button class="btn sm ghost" @click="openForm(t)">编辑</button>
+            <span class="spacer"></span>
+            <button class="icon-btn danger" title="删除隧道" @click="requestDelete(t)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty" v-if="!filtered.length">
+        <div class="big">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 8h10M7 12h10M7 16h6"/><rect x="3" y="4" width="18" height="16" rx="3"/></svg>
+        </div>
+        <template v-if="S.tunnels.length">
+          <b>没有匹配的隧道</b>
+          <span>换个关键词试试，或清空搜索框。</span>
+        </template>
+        <template v-else>
+          <b>还没有隧道</b>
+          <span>创建第一条 SSH 端口转发；也可以在 uTools 搜索框输入「新建 SSH 隧道」直达此处。</span>
+          <button class="btn primary" style="margin-top:4px" @click="openForm(null)">＋ 新建隧道</button>
+        </template>
+      </div>
+    </div>
+
+    <!-- ============ 表单视图 ============ -->
+    <div class="view" v-else-if="S.view==='form' && S.form">
+      <div class="form-head">
+        <button class="btn ghost sm" @click="setView('list')">← 返回</button>
+        <h2>{{formTitle}}</h2>
+      </div>
+
+      <div class="form-errs" v-if="S.formErrors.length">
+        <div v-for="e in S.formErrors">· {{e}}</div>
+      </div>
+      <div class="form-warns" v-if="S.formWarnings.length">
+        <div v-for="w in S.formWarnings">⚠ {{w}}</div>
+      </div>
+
+      <div class="section">
+        <h3>连接</h3>
+        <div class="field-grid">
+          <div class="field"><label>隧道名称 <span class="req">*</span></label>
+            <input v-model="S.form.name" placeholder="例如：公司跳板机"></div>
+          <div class="field"><label>主机 <span class="req">*</span></label>
+            <input v-model="S.form.host" class="mono" placeholder="bastion.corp.com 或 10.0.0.1"></div>
+          <div class="field"><label>端口</label>
+            <input v-model.number="S.form.port" class="mono"></div>
+          <div class="field"><label>用户名 <span class="req">*</span></label>
+            <input v-model="S.form.user" class="mono" placeholder="deploy"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>认证方式</h3>
+        <div class="authrow">
+          <div class="auth-opt" :class="{on:S.form.authMethod==='key'}" @click="setAuthMethod('key')">密钥文件</div>
+          <div class="auth-opt" :class="{on:S.form.authMethod==='password'}" @click="setAuthMethod('password')">密码</div>
+          <div class="auth-opt" :class="{on:S.form.authMethod==='agent'}" @click="setAuthMethod('agent')">ssh-agent</div>
+        </div>
+        <div class="field full" v-if="S.form.authMethod==='key'">
+          <label>私钥路径</label>
+          <div class="keyrow">
+            <input v-model="S.form.keyPath" class="mono">
+            <button class="btn sm" type="button" @click="chooseKey">浏览…</button>
+          </div>
+          <div class="hint" style="margin-top:6px">passphrase（可选）：<input v-model="S.form.passphrase" type="password" placeholder="留空保持已存值" style="height:28px;width:220px;margin-left:6px;border:1px solid var(--border);border-radius:7px;background:var(--win-bg);color:var(--text);padding:0 8px;font-family:inherit;font-size:12px">
+            <br>加密暂存于本机，不写入配置文件、不参与导出与云同步。</div>
+        </div>
+        <div class="field full" v-if="S.form.authMethod==='password'">
+          <label>密码</label>
+          <input v-model="S.form.password" type="password" :placeholder="S.form.hasPassword?'留空保持已存密码':'登录密码'">
+          <div class="hint" style="margin-top:6px">使用 uTools 加密存储（dbCryptoStorage），不写入配置、不参与导出与云同步。
+            <a v-if="S.form.hasPassword" @click="clearPassword(S.form.id)">清除已存密码</a></div>
+        </div>
+        <div class="field full" v-if="S.form.authMethod==='agent'">
+          <div class="hint">使用当前 ssh-agent 中已加载的密钥。macOS 图形应用将按链路自动解析 SSH_AUTH_SOCK（进程环境 → launchctl → 登录 shell）。</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>转发规则 <span style="font-weight:400;color:var(--text-3)">（一个隧道可多条）</span></h3>
+        <div v-for="(r,i) in S.form.rules" :key="i" class="rule-edit">
+          <select v-model="r.type">
+            <option value="L">本地转发</option>
+            <option value="R">反向转发</option>
+            <option value="D">动态 SOCKS</option>
+          </select>
+          <input v-model="r.localPort" :placeholder="r.type==='R'?'远端监听端口':'本地端口'">
+          <input v-if="r.type!=='D'" v-model="r.remoteHost" placeholder="目标主机">
+          <input v-else disabled placeholder="（无需目标）" style="opacity:.45">
+          <input v-if="r.type!=='D'" v-model="r.remotePort" placeholder="目标端口">
+          <input v-else disabled placeholder="—" style="opacity:.45">
+          <label class="sw" title="启用该规则"><input type="checkbox" v-model="r.enabled"><span class="tr"></span><span class="kn"></span></label>
+          <button class="icon-btn danger" title="删除该规则" @click="removeRuleRow(i)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <button class="btn sm" type="button" @click="addRuleRow">＋ 添加规则</button>
+        <div class="hint" style="margin-top:8px;font-size:11px;color:var(--text-3)">本地：本机端口 → 服务器可达的目标；反向：服务器端口 → 目标（默认指向本机）；动态：本机 SOCKS5 代理。</div>
+      </div>
+
+      <div class="section">
+        <h3 class="click" @click="toggleAdv">高级选项 <span style="font-size:10px">{{S.form.advOpen?'▴':'▾'}}</span></h3>
+        <div v-show="S.form.advOpen">
+          <div class="field-grid">
+            <div class="field"><label>跳板机 ProxyJump</label>
+              <input v-model="S.form.proxyJump" class="mono" placeholder="user@jumphost:22（可选）"></div>
+            <div class="field"><label>本地绑定地址</label>
+              <input v-model="S.form.localBindHost" class="mono" placeholder="127.0.0.1"></div>
+            <div class="field"><label>保活间隔（秒）</label>
+              <input v-model.number="S.form.serverAliveInterval" class="mono"></div>
+            <div class="field"><label>连接超时（秒）</label>
+              <input v-model.number="S.form.connectTimeout" class="mono"></div>
+            <div class="field"><label>主机密钥校验</label>
+              <select v-model="S.form.strictHostKeyChecking">
+                <option value="accept-new">accept-new（推荐）</option>
+                <option value="yes">yes（严格）</option>
+                <option value="no">no（不校验）</option>
+              </select></div>
+            <div class="field"><label>断线自动重连</label>
+              <label class="sw" style="margin-top:6px"><input type="checkbox" v-model="S.form.autoReconnect"><span class="tr"></span><span class="kn"></span></label></div>
+            <div class="field"><label>使用系统 ssh_config</label>
+              <label class="sw" style="margin-top:6px"><input type="checkbox" v-model="S.form.useUserSshConfig"><span class="tr"></span><span class="kn"></span></label>
+              <div class="hint">默认关闭（-F /dev/null），行为更可预期</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-foot">
+        <button class="btn" @click="setView('list')">取消</button>
+        <button class="btn primary" @click="saveForm">保存隧道</button>
+      </div>
+    </div>
+
+    <!-- ============ 日志视图 ============ -->
+    <div class="view" v-else-if="S.view==='log' && S.log">
+      <div class="log-head">
+        <button class="btn ghost sm" @click="closeLog">← 返回</button>
+        <div class="ttl"><b>{{S.log.name}} · 日志</b><span>~/.utools-ssh-tunnel/logs/{{S.log.id}}.log</span></div>
+        <button class="btn sm" @click="refreshLog">刷新</button>
+        <button class="btn sm" @click="clearLog">清空</button>
+      </div>
+      <div class="logbox" v-scrollbottom>{{S.log.content || '（暂无日志）'}}</div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-wrap">
+    <div v-for="t in S.toasts" :key="t.id" class="toast">
+      <span class="tdot" :style="{background: t.kind==='red' ? 'var(--red)' : 'var(--green)'}"></span>{{t.msg}}
+    </div>
+  </div>
+
+  <!-- 确认对话框 -->
+  <div class="modal-mask" v-if="S.confirm.open" @click.self="confirmNo">
+    <div class="modal">
+      <h4>{{S.confirm.title}}</h4>
+      <p>{{S.confirm.message}}</p>
+      <div class="row">
+        <button class="btn sm" @click="confirmNo">取消</button>
+        <button class="btn sm" :class="S.confirm.danger ? 'danger' : 'primary'" @click="confirmYes">{{S.confirm.yesText}}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/vue.global.prod.js"></script>
+<script src="js/util.js"></script>
+<script src="js/api.js"></script>
+<script src="js/store.js"></script>
+<script src="js/features.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
