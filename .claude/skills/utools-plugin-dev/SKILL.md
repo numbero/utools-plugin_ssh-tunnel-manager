@@ -25,12 +25,12 @@ index.html      # 渲染层页面
 preload.js      # 可选：Node 能力入口，先于页面脚本执行
 ```
 
-`features[].cmds` 决定搜索框如何唤起插件（字符串或 regex/over/files/window 等匹配对象）。
+`features[].cmds` 决定搜索框如何唤起插件：字符串，或匹配对象 `{type:'regex'|'over'|'files'|'window', label, match, minLength…}`（regex/over 命中时 enter 回调的 payload 即用户输入/匹配文本，带参唤起靠它分发）。
 字段权威定义可对照官方 JSON Schema：<https://github.com/uTools-Labs/utools-api-types/blob/main/resource/utools.schema.json>
 
 ## 2. 运行模型与分层铁律
 
-- **preload 跑在 Electron 渲染进程**（nodeIntegration 开启），不是纯 Node 主进程：可 `require` 全部 Node 原生模块（child_process/fs/os…），但全局是浏览器环境（见 §3 坑 1）。
+- **preload 跑在 Electron 渲染进程**（nodeIntegration 开启），不是纯 Node 主进程：可 `require` 全部 Node 原生模块（child_process/fs/os…），也可用部分 Electron 渲染进程能力（`clipboard`/`nativeImage`/`shell` 等，官方 preload 文档有示例）；但全局是浏览器环境（见 §3 坑 1）。同类能力优先用 utools 封装（如复制用 §4 的 copy 族）。
 - **页面层**通过 `window.utools` 访问宿主 API；preload 通过给 `window` 挂自定义属性向页面暴露方法。
 - 推荐分层：**页面层独占 utools API 与持久化；preload 层只做系统 I/O**，经 `window.api.*`（全部返回 Promise）桥接。这样页面可在普通浏览器里用内存 shim -preview，preload 可脱离 uTools 单测。
 
@@ -38,7 +38,7 @@ preload.js      # 可选：Node 能力入口，先于页面脚本执行
 
 1. **渲染进程定时器没有 unref**：preload 里 `setInterval(...)` 返回 number，链式 `.unref()` 直接 TypeError 且 **preload 静默崩溃**——页面照常渲染、功能全假。一切 `.unref()` 调用先 `typeof x.unref === 'function'` 守护。排查入口：插件窗口 DevTools Console 的 `Unable to load preload script: …`。
 2. **`window.utools` 注入时机可能晚于页面脚本解析**：不要在解析期做"有无 utools"的判定并装兜底模拟——静默 fallback 是最坏容错（UI 正常但数据库/进程零痕迹）。正确做法：延迟引导（轮询等待就绪再 bootstrap）、对 utools 的访问用惰性代理（`new Proxy({}, {get:(_,k)=>window.utools[k]})`）。
-3. **环境版本红线**：渲染层约 Chromium 91、preload 约 Node 14/16（以官方文档当前表述为准）。禁用 `structuredClone`、`fetch`(页面外)、`crypto.randomUUID`、`String.replaceAll`、`Array.at`、逻辑赋值(`??=`)、ES module 页面脚本等；可选链/空值合并/async 可用。
+3. **环境版本红线**：渲染层约 Chromium 91、preload 约 Node 14/16（以官方文档当前表述为准）。禁用 `structuredClone`、`crypto.randomUUID`、`String.replaceAll`、`Array.at`、逻辑赋值(`??=`)、ES module 页面脚本等；可选链/空值合并/async 可用。页面层不得依赖外部网络请求（发布插件官方禁止请求外部资源/动态加载外部 JS，见 FAQ <https://www.u-tools.cn/docs/developer/faq.html>）；确需取数走 preload 的 Node http/https；页面在 file:// 下 fetch/XHR 受 CORS 限制、行为不可靠。
 4. **常驻子进程**：要"宿主退出进程不死"，`spawn(cmd, args, {detached:true, stdio:'pipe'})` 后立刻 `child.unref()`（ChildProcess 的 unref 在渲染进程存在，与坑 1 的定时器不同）。重新接管用「argv 身份标记 + `process.kill(pid,0)` + ps 校验」防 PID 复用：给子进程 argv 塞一个 `-o SetEnv=KEY=<id>` 之类的标记，接管前 `ps -ww -o command= -p <pid>` 校验标记与目标主机都在。
 5. **秘密不进 utools.db**：db 文档可能云同步；密码/密钥 passphrase 存 `utools.dbCryptoStorage`（加密 KV，同步 API），db 文档里只留布尔标记；秘密只经内存传入子进程 stdin，不进 argv/env/日志。
 6. **preload 变更不热更新**：页面改动可 DevTools 重载，preload/engine 改动需重新进入插件或重启 uTools。
@@ -50,6 +50,7 @@ preload.js      # 可选：Node 能力入口，先于页面脚本执行
 - 数据存储（`db.put/get/allDocs` PouchDB 风格；`dbStorage` KV；`dbCryptoStorage` 加密 KV）：<https://www.u-tools.cn/docs/developer/utools-api/db.html>
 - 动态指令（`setFeature({code,cmds,explain,icon,mainHide})` / `removeFeature` / `getFeatures`；`mainHide:true` 命中后不显窗，配合 `showNotification`+`outPlugin` 做静默执行）：<https://www.u-tools.cn/docs/developer/utools-api/features.html>
 - 系统（`showOpenDialog/showSaveDialog` 文件对话框等）：<https://www.u-tools.cn/docs/developer/utools-api/system.html>
+- 复制（页面层剪贴板首选 `utools.copyText/copyImage/copyFiles`；不满足再退 preload 的 Electron clipboard）：<https://www.u-tools.cn/docs/developer/utools-api/copy.html>
 
 ## 5. 图标与主题适配
 
