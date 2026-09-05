@@ -1,6 +1,6 @@
-# SSH 隧道管理器 · uTools 插件
+# SpanTunnel · uTools SSH 隧道管理插件
 
-管理本机 SSH 端口转发隧道的 uTools 插件：本地转发（-L）、反向转发（-R）、动态 SOCKS（-D），
+SpanTunnel：管理本机 SSH 端口转发隧道的 uTools 插件，本地转发（-L）、反向转发（-R）、动态 SOCKS（-D），
 一键启停、后台常驻（退出 uTools 隧道不断）、状态可视、日志可查。
 
 - 产品设计文档：[`docs/PRD.md`](docs/PRD.md)
