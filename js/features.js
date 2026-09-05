@@ -8,10 +8,16 @@
   var S = STM.store;
   var fn = STM.fn;
 
+  // 图标随主题：解析为深色时注册深色版，否则浅色版（默认浅）
+  function iconFor() {
+    return fn.resolvedDark() ? 'assets/ssh-tunnel-dark.svg' : 'assets/ssh-tunnel-light.svg';
+  }
+
   function desired(t) {
+    var icon = iconFor();
     return [
-      { code: 'start_' + t._id, explain: '启动隧道「' + t.name + '」', cmds: ['启动 ' + t.name, 'start ' + t.name], mainHide: true },
-      { code: 'stop_' + t._id, explain: '停止隧道「' + t.name + '」', cmds: ['停止 ' + t.name, 'stop ' + t.name], mainHide: true },
+      { code: 'start_' + t._id, explain: '启动隧道「' + t.name + '」', cmds: ['启动 ' + t.name, 'start ' + t.name], icon: icon, mainHide: true },
+      { code: 'stop_' + t._id, explain: '停止隧道「' + t.name + '」', cmds: ['停止 ' + t.name, 'stop ' + t.name], icon: icon, mainHide: true },
     ];
   }
 

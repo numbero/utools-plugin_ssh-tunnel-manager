@@ -13,14 +13,22 @@
     {
       "code": "main",
       "explain": "SpanTunnel · SSH 隧道管理",
-      "icon": "assets/logo.svg",
-      "cmds": ["SpanTunnel", "SSH 隧道", "SSH Tunnel", "隧道管理"]
+      "icon": "assets/ssh-tunnel-dark.svg",
+      "cmds": [
+        "SpanTunnel",
+        "SSH 隧道",
+        "SSH Tunnel",
+        "隧道管理"
+      ]
     },
     {
       "code": "new",
       "explain": "SpanTunnel · 新建 SSH 隧道",
-      "icon": "assets/logo.svg",
-      "cmds": ["新建 SSH 隧道", "新建隧道"]
+      "icon": "assets/ssh-tunnel-dark.svg",
+      "cmds": [
+        "新建 SSH 隧道",
+        "新建隧道"
+      ]
     }
   ]
 }

@@ -80,6 +80,18 @@ input,textarea{user-select:text}
 .btn.danger{background:var(--red);border-color:transparent;color:#fff;font-weight:600}
 .divider{width:1px;height:20px;background:var(--border-strong);margin:0 1px;flex:none}
 
+/* 主题三态切换控件 */
+.tseg{display:flex;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:2px;flex:none}
+.tseg button{width:30px;height:24px;border:0;background:transparent;border-radius:6px;cursor:pointer;
+  color:var(--text-3);display:inline-flex;align-items:center;justify-content:center}
+.tseg button svg{width:13px;height:13px}
+.tseg button:hover{color:var(--text-2)}
+.tseg button.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+
+/* 品牌标识：CSS 变量着色，随主题实时变化 */
+.brand{display:inline-flex;width:16px;height:16px;color:var(--text);opacity:.9;flex:none;vertical-align:-2px;margin-right:6px}
+.brand svg{width:100%;height:100%}
+
 /* ============ 面板 ============ */
 .panel{height:calc(100vh - 53px);overflow-y:auto;position:relative}
 .banner ~ .panel{height:calc(100vh - 88px)}

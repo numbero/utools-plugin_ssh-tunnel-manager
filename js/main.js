@@ -5,9 +5,7 @@
   var fn = STM.fn;
 
   function applyTheme() {
-    var dark = false;
-    try { dark = window.utools.isDarkColors(); } catch (e) {}
-    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', fn.resolvedDark() ? 'dark' : 'light');
   }
   fn.applyTheme = applyTheme;
 
@@ -21,11 +19,14 @@
     // uTools 进入事件分发（动态指令 / 静态指令）
     try { U.onPluginEnter(function (arg) { STM.features.handleEnter(arg); }); } catch (e) {}
 
-    // 主题跟随：初始化 + 系统变化
+    // 主题：载入用户选择 → 应用；「跟随」时实时响应系统外观变化
+    fn.loadThemeMode();
     applyTheme();
     try {
       var mq = window.matchMedia('(prefers-color-scheme: dark)');
-      var l = function () { applyTheme(); };
+      var l = function () {
+        if (S.themeMode === 'auto') { applyTheme(); STM.features.syncFeatures(); }
+      };
       if (mq.addEventListener) mq.addEventListener('change', l); else mq.addListener(l);
     } catch (e) {}
 

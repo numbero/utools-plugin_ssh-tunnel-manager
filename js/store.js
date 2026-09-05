@@ -29,6 +29,7 @@
     toasts: [],
     confirm: { open: false, title: '', message: '', yesText: '确认', danger: false, onYes: null },
     menuFor: null,
+    themeMode: 'dark',   // auto | light | dark（默认深色）
   });
 
   /* ================= db ================= */
@@ -419,6 +420,23 @@
   function confirmYes() { var cb = S.confirm.onYes; S.confirm.open = false; if (cb) cb(); }
   function confirmNo() { S.confirm.open = false; }
 
+  /* ================= 主题 ================= */
+  function resolvedDark() {
+    if (S.themeMode === 'auto') {
+      try { return !!window.utools.isDarkColors(); } catch (e) { return false; }
+    }
+    return S.themeMode === 'dark';
+  }
+  function loadThemeMode() {
+    try { S.themeMode = U.dbStorage.getItem('stm_theme') || 'dark'; } catch (e) { S.themeMode = 'dark'; }
+  }
+  function setThemeMode(m) {
+    S.themeMode = m;
+    try { U.dbStorage.setItem('stm_theme', m); } catch (e) {}
+    if (STM.fn.applyTheme) STM.fn.applyTheme();
+    STM.features.syncFeatures(); // 图标随主题重注册
+  }
+
   /* ================= 展示辅助 ================= */
   function statusText(s) {
     if (s.status === 'running') return '运行中';
@@ -452,5 +470,6 @@
     exportConfig: exportConfig, importConfig: importConfig,
     toast: toast, confirmAsk: confirmAsk, confirmYes: confirmYes, confirmNo: confirmNo,
     statusText: statusText, uptime: uptime, enabledCount: enabledCount, ruleMapText: ruleMapText,
+    resolvedDark: resolvedDark, loadThemeMode: loadThemeMode, setThemeMode: setThemeMode,
   };
 })();
