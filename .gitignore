@@ -3,3 +3,6 @@ node_modules/
 .agent/
 *.log
 dist/
+
+.claude
+.skillshare
