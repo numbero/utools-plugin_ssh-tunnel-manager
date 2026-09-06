@@ -29,6 +29,22 @@
       formTitle: function () {
         return S.formMode === 'edit' ? '编辑「' + (S.form ? S.form.name : '') + '」' : '新建隧道';
       },
+      importCheckedCount: function () {
+        if (!S.importDlg) return 0;
+        return S.importDlg.items.filter(function (i) { return i.checked; }).length;
+      },
+      importSkippedCount: function () {
+        if (!S.importDlg) return 0;
+        var k = S.importDlg.skipped;
+        return k.wildcard.length + k.match.length + k.noForward;
+      },
+      searchHitTotal: function () {
+        var res = S.search.results;
+        if (!res) return 0;
+        var n = 0;
+        (res.files || []).forEach(function (f) { n += f.hits.length; });
+        return n;
+      },
     },
     methods: Object.assign({}, fn, {
       st: fn.st,
@@ -36,6 +52,26 @@
       setAuthMethod: function (m) { if (S.form) S.form.authMethod = m; },
       toggleAdv: function () { if (S.form) S.form.advOpen = !S.form.advOpen; },
       closeMenu: function () { S.menuFor = null; },
+      // 检索高亮：先转义再包 <mark>；大小写不敏感时按原文下标分段（规避 replaceAll）
+      hl: function (text) {
+        var q = (S.search.query || '').trim();
+        var esc = STM.util.escapeHtml;
+        if (!q) return esc(text);
+        if (!S.search.caseSensitive) {
+          var low = String(text).toLowerCase();
+          var nl = q.toLowerCase();
+          var out = '';
+          var i = 0;
+          for (;;) {
+            var p = low.indexOf(nl, i);
+            if (p < 0) { out += esc(String(text).slice(i)); break; }
+            out += esc(String(text).slice(i, p)) + '<mark>' + esc(String(text).slice(p, p + q.length)) + '</mark>';
+            i = p + q.length;
+          }
+          return out;
+        }
+        return esc(text).split(esc(q)).join('<mark>' + esc(q) + '</mark>');
+      },
     }),
   });
 

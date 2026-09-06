@@ -23,8 +23,10 @@
     </div>
     <button class="btn ghost sm" title="启动全部已停止隧道" @click="startAll">▶ 全部启动</button>
     <button class="btn ghost sm" title="停止全部运行中隧道" @click="stopAll">■ 全部停止</button>
+    <button class="icon-btn" title="从 ~/.ssh/config 导入" @click="openSshImport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h7"/><path d="m17 14 3 3-3 3"/></svg></button>
     <button class="icon-btn" title="导入配置" @click="importConfig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg></button>
     <button class="icon-btn" title="导出配置" @click="exportConfig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V9m0 0 4 4m-4-4-4 4M4 3h16"/></svg></button>
+    <button class="icon-btn" title="日志全文检索" @click="openSearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4z"/><path d="m10 12 2 2 4-4"/></svg></button>
     <div class="tseg" title="主题">
       <button :class="{on:S.themeMode==='auto'}" title="跟随系统" @click="setThemeMode('auto')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor" stroke="none"/></svg></button>
       <button :class="{on:S.themeMode==='light'}" title="浅色" @click="setThemeMode('light')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg></button>
@@ -76,6 +78,7 @@
             <div v-for="r in t.rules" :key="r.id" class="rule" :class="{off:!r.enabled}">
               <span class="rchip" :class="r.type">{{typeLabel(r.type)}}</span>
               <span class="map">{{ruleMapText(r)}}</span>
+              <span v-if="r.type==='R' && r.bindAll" class="chip warn" title="允许远端局域网访问（远端绑 0.0.0.0）">LAN</span>
               <label class="sw" :title="r.enabled?'停用该规则':'启用该规则'">
                 <input type="checkbox" :checked="r.enabled" @change="toggleRule(t,r,$event.target.checked)">
                 <span class="tr"></span><span class="kn"></span>
@@ -98,7 +101,7 @@
 
       <div class="empty" v-if="!filtered.length">
         <div class="big">
-          <span class="brand" style="width:26px;height:26px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h18"/><ellipse cx="12" cy="12" rx="2.6" ry="7.5"/><circle cx="3" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="21" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h18"/><ellipse cx="12" cy="12" rx="2.6" ry="7.5"/><circle cx="3" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="21" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
         </div>
         <template v-if="S.tunnels.length">
           <b>没有匹配的隧道</b>
@@ -106,8 +109,17 @@
         </template>
         <template v-else>
           <b>还没有隧道</b>
-          <span>创建第一条 SSH 端口转发；也可以在 uTools 搜索框输入「新建 SSH 隧道」直达此处。</span>
-          <button class="btn primary" style="margin-top:4px" @click="openForm(null)">＋ 新建隧道</button>
+          <span>创建第一条 SSH 端口转发，或从现有 ssh_config 批量导入。</span>
+          <div class="empty-actions">
+            <button class="btn primary" @click="openForm(null)">＋ 新建隧道</button>
+            <button class="btn" @click="openSshImport">从 ~/.ssh/config 导入</button>
+          </div>
+          <div class="tagrow" style="justify-content:center;margin-top:2px">
+            <span class="rtag L">本地 -L</span>
+            <span class="rtag R">反向 -R</span>
+            <span class="rtag D">动态 SOCKS -D</span>
+          </div>
+          <span style="font-size:11px">也可在 uTools 搜索框输入「新建 SSH 隧道」直达表单</span>
         </template>
       </div>
     </div>
@@ -169,21 +181,32 @@
 
       <div class="section">
         <h3>转发规则 <span style="font-weight:400;color:var(--text-3)">（一个隧道可多条）</span></h3>
-        <div v-for="(r,i) in S.form.rules" :key="i" class="rule-edit">
-          <select v-model="r.type">
-            <option value="L">本地转发</option>
-            <option value="R">反向转发</option>
-            <option value="D">动态 SOCKS</option>
-          </select>
-          <input v-model="r.localPort" :placeholder="r.type==='R'?'远端监听端口':'本地端口'">
-          <input v-if="r.type!=='D'" v-model="r.remoteHost" placeholder="目标主机">
-          <input v-else disabled placeholder="（无需目标）" style="opacity:.45">
-          <input v-if="r.type!=='D'" v-model="r.remotePort" placeholder="目标端口">
-          <input v-else disabled placeholder="—" style="opacity:.45">
-          <label class="sw" title="启用该规则"><input type="checkbox" v-model="r.enabled"><span class="tr"></span><span class="kn"></span></label>
-          <button class="icon-btn danger" title="删除该规则" @click="removeRuleRow(i)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
-          </button>
+        <div v-for="(r,i) in S.form.rules" :key="i" class="rule-wrap">
+          <div class="rule-edit">
+            <select v-model="r.type">
+              <option value="L">本地转发</option>
+              <option value="R">反向转发</option>
+              <option value="D">动态 SOCKS</option>
+            </select>
+            <input v-model="r.localPort" :placeholder="r.type==='R'?'远端监听端口':'本地端口'">
+            <input v-if="r.type!=='D'" v-model="r.remoteHost" placeholder="目标主机">
+            <input v-else disabled placeholder="（无需目标）" style="opacity:.45">
+            <input v-if="r.type!=='D'" v-model="r.remotePort" placeholder="目标端口">
+            <input v-else disabled placeholder="—" style="opacity:.45">
+            <label class="sw" title="启用该规则"><input type="checkbox" v-model="r.enabled"><span class="tr"></span><span class="kn"></span></label>
+            <button class="icon-btn danger" title="删除该规则" @click="removeRuleRow(i)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div v-if="r.type==='R'" class="rule-sub">
+            <label class="sw" title="允许远端局域网访问"><input type="checkbox" v-model="r.bindAll"><span class="tr"></span><span class="kn"></span></label>
+            <span class="lbl"><b>允许远端局域网访问</b>（远端绑 0.0.0.0，默认仅 127.0.0.1）</span>
+            <div v-if="r.bindAll" class="hint warn">
+              ⚠ 远端端口对远端网络内所有主机可见<br>
+              ⚠ 需远端 sshd 开启 GatewayPorts 才生效，否则静默降级 127.0.0.1<br>
+              ⚠ 请先确认远端防火墙 / 安全组
+            </div>
+          </div>
         </div>
         <button class="btn sm" type="button" @click="addRuleRow">＋ 添加规则</button>
         <div class="hint" style="margin-top:8px;font-size:11px;color:var(--text-3)">本地：本机端口 → 服务器可达的目标；反向：服务器端口 → 目标（默认指向本机）；动态：本机 SOCKS5 代理。</div>
@@ -232,6 +255,55 @@
       </div>
       <div class="logbox" v-scrollbottom>{{S.log.content || '（暂无日志）'}}</div>
     </div>
+
+    <!-- ============ 检索视图 ============ -->
+    <div class="view" v-else-if="S.view==='search'">
+      <div class="search-head">
+        <button class="btn ghost sm" @click="closeSearch">← 返回</button>
+        <div class="q">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input v-model="S.search.query" placeholder="搜索全部隧道日志…（回车即搜）" @keydown.enter="doSearch">
+          <span class="aa" :class="{on:S.search.caseSensitive}" title="区分大小写" @click="S.search.caseSensitive = !S.search.caseSensitive">Aa</span>
+        </div>
+        <button class="btn sm primary" @click="doSearch"><span v-if="S.search.loading" class="spin"></span>&nbsp;搜索</button>
+      </div>
+
+      <div class="search-sum tagrow" v-if="S.search.results">
+        <span class="chip warn">{{searchHitTotal}} 处命中</span>
+        <span class="badge grey">{{S.search.results.files.length}} 个文件</span>
+        <span class="badge grey">扫描 {{S.search.scanned}}</span>
+        <span class="badge grey">{{S.search.elapsedMs}} ms</span>
+        <span class="rtag j">{{S.search.query}}</span>
+      </div>
+
+      <template v-if="S.search.results">
+        <div v-for="f in S.search.results.files" :key="f.id" class="sres-group">
+          <div class="sres-head">
+            <b>{{tunnelNameById(f.id)}}</b><span class="id">{{f.id}}</span>
+            <span class="chip stopped">{{f.hits.length}} 处命中</span>
+            <span v-if="f.truncated" class="chip warn">已达上限，截断</span>
+            <span class="right"><button class="btn sm ghost" @click="jumpToLogFromSearch(f.id)">查看日志 →</button></span>
+          </div>
+          <div v-for="(h,hi) in f.hits" :key="hi" class="sres-hit">
+            <div class="sres-ctx"><template v-for="(b,bi) in h.before" :key="'b'+bi"><span class="ln">{{h.lineNo - h.before.length + bi}}</span>{{b}}
+</template><span class="hitline"><span class="ln">{{h.lineNo}}</span><span v-html="hl(h.text)"></span></span>
+<template v-for="(a,ai) in h.after" :key="'a'+ai"><span class="ln">{{h.lineNo + 1 + ai}}</span>{{a}}
+</template></div>
+          </div>
+        </div>
+        <div class="empty" v-if="!S.search.results.files.length">
+          <b>没有命中</b>
+          <span>换个关键词，或先启动几条隧道产生日志。</span>
+        </div>
+      </template>
+      <div class="empty" v-else-if="!S.search.loading">
+        <div class="big">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </div>
+        <b>日志全文检索</b>
+        <span>搜索全部隧道的日志文件（~/.utools-ssh-tunnel/logs/），按隧道分组并展示命中上下文。</span>
+      </div>
+    </div>
   </div>
 
   <!-- Toast -->
@@ -250,6 +322,63 @@
         <button class="btn sm" @click="confirmNo">取消</button>
         <button class="btn sm" :class="S.confirm.danger ? 'danger' : 'primary'" @click="confirmYes">{{S.confirm.yesText}}</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ssh_config 导入对话框 -->
+  <div class="modal-mask" v-if="S.importDlg" @click.self="closeImportDlg">
+    <div class="modal wide">
+      <h4>从 ~/.ssh/config 导入隧道 <span class="badge grey">一次性 · 勾选导入</span></h4>
+      <div class="import-path" v-if="S.importDlg.loading"><span class="spin"></span> 解析中…</div>
+      <div class="form-errs" style="margin-bottom:10px" v-else-if="S.importDlg.error">{{S.importDlg.error}}</div>
+      <template v-else>
+        <div class="import-path">{{S.importDlg.path}}</div>
+        <div class="stat-grid">
+          <div class="stat ok"><b>{{S.importDlg.items.length}}</b><span>可导入</span></div>
+          <div class="stat"><b>{{importSkippedCount}}</b><span>跳过</span></div>
+          <div class="stat warn"><b>{{S.importDlg.includes.length}}</b><span>Include 未解析</span></div>
+          <div class="stat err"><b>{{S.importDlg.errors.length}}</b><span>解析告警</span></div>
+        </div>
+        <details class="det" v-if="importSkippedCount || S.importDlg.includes.length || S.importDlg.errors.length">
+          <summary>跳过 / 告警明细</summary>
+          <div class="tagrow">
+            <span v-for="(w,i) in S.importDlg.skipped.wildcard" :key="'w'+i" class="badge grey">通配符 {{w}}</span>
+            <span v-for="(m,i) in S.importDlg.skipped.match" :key="'m'+i" class="badge grey">Match {{m}}</span>
+            <span v-if="S.importDlg.skipped.noForward" class="badge grey">无转发项 ×{{S.importDlg.skipped.noForward}}</span>
+            <span v-for="(inc,i) in S.importDlg.includes" :key="'i'+i" class="badge warn">Include {{inc.path}}（不跟进）</span>
+            <span v-for="(er,i) in S.importDlg.errors" :key="'e'+i" class="badge err">L{{er.line}} {{er.text}}</span>
+          </div>
+        </details>
+
+        <div class="import-list" v-if="S.importDlg.items.length">
+          <div class="import-row head">
+            <input type="checkbox" :checked="S.importDlg.allChecked" @change="toggleImportAll($event.target.checked)"><span>全选</span>
+            <span style="margin-left:auto">来源行号</span>
+          </div>
+          <label v-for="it in S.importDlg.items" :key="it.doc._id" class="import-row">
+            <input type="checkbox" :checked="it.checked" @change="toggleImportItem(it)">
+            <div class="import-id">
+              <div class="import-name">{{it.doc.name}}
+                <span v-for="(b,bi) in it.badges" :key="'b'+bi" class="badge" :class="b.cls">{{b.text}}</span>
+              </div>
+              <div class="import-conn">{{it.conn}}</div>
+              <div class="tagrow" style="margin-top:4px">
+                <span v-for="(tg,ti) in it.tags" :key="'t'+ti" class="rtag" :class="tg.cls">{{tg.text}}</span>
+              </div>
+            </div>
+            <span class="import-line">L{{it.line}}</span>
+          </label>
+        </div>
+        <div class="empty" v-else style="padding:26px">
+          <b>没有可导入的 Host</b>
+          <span>仅导入含转发指令（LocalForward / RemoteForward / DynamicForward）的 Host 条目。</span>
+        </div>
+
+        <div class="row">
+          <button class="btn sm" @click="closeImportDlg">取消</button>
+          <button class="btn sm primary" @click="doSshImport">导入所选（{{importCheckedCount}}）</button>
+        </div>
+      </template>
     </div>
   </div>
 </div>

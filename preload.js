@@ -11,6 +11,7 @@ const logs = require('./engine/logs');
 const ports = require('./engine/ports');
 const spawner = require('./engine/spawner');
 const agent = require('./engine/agent');
+const sshConfig = require('./engine/ssh-config');
 
 // 某些 uTools 版本的 preload 上下文可能无 window：兜底到 globalThis，避免静默崩
 const win = (typeof window !== 'undefined') ? window : globalThis;
@@ -29,6 +30,10 @@ win.api = {
 
   logTail: (id, n) => Promise.resolve(logs.tail(id, n)),
   logClear: (id) => Promise.resolve(logs.clear(id)),
+  logFiles: () => Promise.resolve(logs.listFiles()),
+  logSearch: (kw, opts) => Promise.resolve(logs.search(kw, opts)),
+
+  parseSshConfig: (p) => Promise.resolve(sshConfig.readAndParse(p)),
 
   writeFile: (p, text) => fs.promises.writeFile(p, text, 'utf8'),
   readFile: (p) => fs.promises.readFile(p, 'utf8'),

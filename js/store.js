@@ -30,6 +30,8 @@
     confirm: { open: false, title: '', message: '', yesText: '确认', danger: false, onYes: null },
     menuFor: null,
     themeMode: 'dark',   // auto | light | dark（默认深色）
+    importDlg: null,     // {path,loading,error,items[],allChecked,skipped{wildcard[],match[],noForward},includes[],errors[]}
+    search: { query: '', caseSensitive: false, results: null, loading: false, scanned: 0, elapsedMs: 0 },
   });
 
   /* ================= db ================= */
@@ -132,7 +134,7 @@
   /* ================= 视图 ================= */
   function setView(v) {
     S.view = v;
-    var heights = { list: 560, form: 660, log: 600 };
+    var heights = { list: 560, form: 660, log: 600, search: 600 };
     try { U.setExpendHeight(heights[v] || 560); } catch (e) {}
   }
   function toggleExpand(id) { S.expanded[id] = !S.expanded[id]; S.menuFor = null; }
@@ -147,7 +149,7 @@
   }
 
   /* ================= 表单 ================= */
-  function blankRule() { return { type: 'L', enabled: true, localPort: '', remoteHost: '127.0.0.1', remotePort: '' }; }
+  function blankRule() { return { type: 'L', enabled: true, localPort: '', remoteHost: '127.0.0.1', remotePort: '', bindAll: false }; }
 
   function openForm(t) {
     S.formMode = t ? 'edit' : 'new';
@@ -264,6 +266,8 @@
         localPort: Number(r.localPort),
         remoteHost: r.type !== 'D' ? String(r.remoteHost).trim() : '',
         remotePort: r.type !== 'D' ? Number(r.remotePort) : 0,
+        // 白名单式重组：bindAll 不显式带上会在编辑保存时静默丢失
+        bindAll: r.type === 'R' ? !!r.bindAll : false,
       };
     });
     doc.updatedAt = Date.now();
@@ -337,21 +341,24 @@
   }
 
   /* ================= 日志 ================= */
-  function openLog(t) {
+  // origin 记录进入前视图：检索页跳日志后「返回」仍回检索页；已删隧道的遗留日志也可看
+  function openLogFor(id, name, origin) {
     if (S.log && S.log.timer) clearInterval(S.log.timer);
-    S.log = { id: t._id, name: t.name, content: '', timer: null };
+    S.log = { id: id, name: name, content: '', timer: null, origin: origin || S.view };
     setView('log');
     refreshLog();
     S.log.timer = setInterval(refreshLog, 2000);
   }
+  function openLog(t) { openLogFor(t._id, t.name, S.view); }
   function refreshLog() {
     if (!S.log) return;
     window.api.logTail(S.log.id, 400).then(function (c) { if (S.log) S.log.content = c; });
   }
   function closeLog() {
     if (S.log && S.log.timer) clearInterval(S.log.timer);
+    var back = (S.log && S.log.origin) || 'list';
     S.log = null;
-    setView('list');
+    setView(back === 'log' ? 'list' : back);
   }
   async function clearLog() {
     if (!S.log) return;
@@ -405,6 +412,176 @@
     });
   }
 
+  /* ================= ~/.ssh/config 导入 ================= */
+  // 解析结果 entry → 标准隧道文档草稿（与 saveForm 产物同构）
+  function draftFromEntry(e, defUser) {
+    var rules = (e.forwards || []).map(function (f) {
+      return {
+        id: 'f' + f.line,
+        type: f.dir,
+        enabled: true,
+        localPort: f.port,
+        remoteHost: f.dir !== 'D' ? f.targetHost : '',
+        remotePort: f.dir !== 'D' ? f.targetPort : 0,
+        bindAll: f.dir === 'R' ? (f.bind === '0.0.0.0' || f.bind === '*') : false,
+      };
+    });
+    // L/D 带一致的非回环 bind → 提升为 localBindHost
+    var binds = {};
+    (e.forwards || []).forEach(function (f) {
+      if (f.dir !== 'R' && f.bind && f.bind !== '127.0.0.1' && f.bind !== 'localhost') binds[f.bind] = true;
+    });
+    var bindKeys = Object.keys(binds);
+    var doc = {
+      _id: util.uid(),
+      type: 'tunnel',
+      name: e.aliases[0] || ('host-' + e.line),
+      host: e.hostName || e.aliases[0] || '',
+      port: e.port || 22,
+      user: e.user || defUser || '',
+      auth: e.identityFiles.length
+        ? { method: 'key', keyPath: e.identityFiles[0], hasPassword: false, hasPassphrase: false }
+        : { method: 'agent', hasPassword: false, hasPassphrase: false },
+      options: {
+        proxyJump: e.proxyJump || '',
+        localBindHost: bindKeys.length === 1 ? bindKeys[0] : '127.0.0.1',
+        serverAliveInterval: 30,
+        connectTimeout: 15,
+        strictHostKeyChecking: 'accept-new',
+        autoReconnect: true,
+        useUserSshConfig: false,
+      },
+      rules: rules,
+      createdAt: Date.now(),
+    };
+    return doc;
+  }
+
+  function tagsOf(doc) {
+    var tags = doc.rules.map(function (r) {
+      if (r.type === 'D') return { cls: 'D', text: 'D ' + r.localPort };
+      if (r.type === 'R') return { cls: 'R', text: 'R :' + r.localPort + (r.bindAll ? ' · LAN' : '') };
+      return { cls: 'L', text: 'L ' + r.localPort };
+    });
+    tags.push({ cls: 'j', text: doc.auth.method === 'key' ? '密钥' : 'agent' });
+    if (doc.options.proxyJump) tags.push({ cls: 'j', text: '-J ' + doc.options.proxyJump });
+    return tags;
+  }
+
+  function openSshImport() {
+    if (!window.api || typeof window.api.parseSshConfig !== 'function') {
+      toast('当前环境不支持解析 ssh_config（请重载插件）', 'red');
+      return;
+    }
+    S.importDlg = {
+      path: '', loading: true, error: '', items: [], allChecked: true,
+      skipped: { wildcard: [], match: [], noForward: 0 }, includes: [], errors: [],
+    };
+    window.api.parseSshConfig().then(function (res) {
+      if (!S.importDlg) return;
+      var d = S.importDlg;
+      d.loading = false;
+      if (!res || !res.ok) { d.error = (res && res.error) || '解析失败'; return; }
+      d.path = res.path;
+      d.includes = res.result.includes || [];
+      d.errors = res.result.errors || [];
+      var defUser = res.result.defaultUser || '';
+      var portSeen = {};
+      var items = [];
+      (res.result.entries || []).forEach(function (e) {
+        if (e.kind === 'match') { d.skipped.match.push(e.aliases.join(' ')); return; }
+        if (e.skipReason === 'wildcard') { d.skipped.wildcard.push(e.aliases.join(' ')); return; }
+        if (!e.hasForward) { d.skipped.noForward++; return; }
+        var doc = draftFromEntry(e, defUser);
+        var badges = [];
+        var dup = S.tunnels.some(function (t) {
+          return t.host === doc.host && Number(t.port) === Number(doc.port) && t.user === doc.user;
+        });
+        if (dup) badges.push({ cls: 'warn', text: '疑似已存在' });
+        var conflict = doc.rules.some(function (r) {
+          if (r.type === 'R') return false;
+          if (portSeen[String(r.localPort)]) return true;
+          portSeen[String(r.localPort)] = true;
+          return false;
+        });
+        if (conflict) badges.push({ cls: 'warn', text: '端口冲突' });
+        items.push({
+          checked: true,
+          doc: doc,
+          conn: (doc.user ? doc.user + '@' : '') + doc.host + ':' + doc.port,
+          tags: tagsOf(doc),
+          badges: badges,
+          line: e.line,
+        });
+      });
+      d.items = items;
+      // 私钥可读性异步标注（不阻断勾选）
+      items.forEach(function (it) {
+        if (it.doc.auth.method !== 'key' || !window.api.checkKey) return;
+        window.api.checkKey(it.doc.auth.keyPath).then(function (kr) {
+          if (kr && !kr.ok) it.badges.push({ cls: 'err', text: '私钥缺失' });
+        });
+      });
+    });
+  }
+  function closeImportDlg() { S.importDlg = null; }
+  function toggleImportItem(it) {
+    it.checked = !it.checked;
+    S.importDlg.allChecked = S.importDlg.items.every(function (x) { return x.checked; });
+  }
+  function toggleImportAll(v) {
+    S.importDlg.items.forEach(function (x) { x.checked = v; });
+    S.importDlg.allChecked = v;
+  }
+  function doSshImport() {
+    var d = S.importDlg;
+    if (!d) return;
+    var sel = d.items.filter(function (i) { return i.checked; });
+    if (!sel.length) { toast('未勾选任何草稿', 'red'); return; }
+    var n = 0;
+    sel.forEach(function (it) {
+      var doc = util.clone(it.doc);
+      doc.order = maxOrder() + 1 + n;
+      doc.createdAt = Date.now();
+      doc.rules = doc.rules.map(function (r, i) {
+        r.id = 'r' + (i + 1) + '_' + Date.now().toString(36);
+        return r;
+      });
+      delete doc._rev;
+      putDoc(doc);
+      S.tunnels.push(doc);
+      S.states[doc._id] = { status: 'stopped' };
+      n++;
+    });
+    STM.features.syncFeatures();
+    S.importDlg = null;
+    toast('已从 ssh_config 导入 ' + n + ' 条隧道（秘密请在编辑表单补填）');
+  }
+
+  /* ================= 日志全文检索 ================= */
+  function tunnelNameById(id) {
+    var t = S.tunnels.find(function (x) { return x._id === id; });
+    return t ? t.name : '（隧道已删除）';
+  }
+  function openSearch() { setView('search'); }
+  function closeSearch() { setView('list'); }
+  function doSearch() {
+    if (!window.api || typeof window.api.logSearch !== 'function') {
+      toast('当前环境不支持日志检索（请重载插件）', 'red');
+      return;
+    }
+    var q = (S.search.query || '').trim();
+    if (!q) return;
+    S.search.loading = true;
+    window.api.logSearch(q, { caseSensitive: S.search.caseSensitive, context: 1 }).then(function (res) {
+      S.search.loading = false;
+      S.search.results = res || { keyword: q, scanned: 0, elapsedMs: 0, files: [] };
+      S.search.scanned = S.search.results.scanned || 0;
+      S.search.elapsedMs = S.search.results.elapsedMs || 0;
+    });
+  }
+  function jumpToLogFromSearch(id) { openLogFor(id, tunnelNameById(id), 'search'); }
+
   /* ================= toast / confirm ================= */
   function toast(msg, kind) {
     var t = { id: Math.random().toString(36).slice(2), msg: msg, kind: kind || '' };
@@ -454,7 +631,7 @@
   }
   function ruleMapText(r) {
     if (r.type === 'D') return r.localPort + '（SOCKS5）';
-    if (r.type === 'R') return '远端 :' + r.localPort + ' → ' + r.remoteHost + ':' + r.remotePort;
+    if (r.type === 'R') return '远端 :' + r.localPort + ' → ' + r.remoteHost + ':' + r.remotePort + (r.bindAll ? ' · LAN' : '');
     return r.localPort + ' → ' + r.remoteHost + ':' + r.remotePort;
   }
 
@@ -466,8 +643,12 @@
     openForm: openForm, saveForm: saveForm, addRuleRow: addRuleRow, removeRuleRow: removeRuleRow, chooseKey: chooseKey,
     requestDelete: requestDelete, duplicateTunnel: duplicateTunnel, moveTunnel: moveTunnel,
     clearPassword: clearPassword,
-    openLog: openLog, closeLog: closeLog, refreshLog: refreshLog, clearLog: clearLog,
+    openLog: openLog, openLogFor: openLogFor, closeLog: closeLog, refreshLog: refreshLog, clearLog: clearLog,
     exportConfig: exportConfig, importConfig: importConfig,
+    openSshImport: openSshImport, closeImportDlg: closeImportDlg,
+    toggleImportItem: toggleImportItem, toggleImportAll: toggleImportAll, doSshImport: doSshImport,
+    openSearch: openSearch, closeSearch: closeSearch, doSearch: doSearch,
+    jumpToLogFromSearch: jumpToLogFromSearch, tunnelNameById: tunnelNameById,
     toast: toast, confirmAsk: confirmAsk, confirmYes: confirmYes, confirmNo: confirmNo,
     statusText: statusText, uptime: uptime, enabledCount: enabledCount, ruleMapText: ruleMapText,
     resolvedDark: resolvedDark, loadThemeMode: loadThemeMode, setThemeMode: setThemeMode,

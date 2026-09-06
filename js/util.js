@@ -10,6 +10,11 @@ STM.util = {
     return Number.isInteger(n) && n >= 1 && n <= 65535;
   },
   clone: function (o) { return JSON.parse(JSON.stringify(o)); },
+  escapeHtml: function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  },
   fmtUptime: function (ms) {
     if (ms == null || isNaN(ms) || ms < 0) return '';
     var s = Math.floor(ms / 1000);

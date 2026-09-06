@@ -5,6 +5,9 @@ SpanTunnel：管理本机 SSH 端口转发隧道的 uTools 插件，本地转发
 
 - 产品设计文档：[`docs/PRD.md`](docs/PRD.md)
 - 高保真交互原型：[`docs/ui-prototype.html`](docs/ui-prototype.html)（浏览器直接打开体验）
+- v2.0 设计文档 / 原型：[`docs/DESIGN-v2.md`](docs/DESIGN-v2.md) · [`docs/ui-v2-prototype.html`](docs/ui-v2-prototype.html)
+- 演进规划：[`docs/ROADMAP.md`](docs/ROADMAP.md)
+- 演进规划（v2+）：[`docs/ROADMAP.md`](docs/ROADMAP.md)
 
 ## 目录结构
 
@@ -13,7 +16,8 @@ plugin.json          # uTools 插件配置（指令：SSH 隧道 / 新建 SSH �
 index.html           # 页面（Vue 3 全局构建，无构建步骤）
 preload.js           # 引擎入口：挂 window.api（不触碰 utools API）
 engine/              # 纯 Node 层：ssh 参数/spawn/状态机/日志/端口/agent/标记
-  ssh-args.js        #   参数拼装（-N -T、-L/-R/-D、保活、SetEnv 身份标记…）
+  ssh-args.js        #   参数拼装（-N -T、-L/-R/-D、保活、SetEnv 身份标记、-R 绑定开关…）
+  ssh-config.js      #   ~/.ssh/config 轻量解析器（v2.0：批量导入）
   spawner.js         #   detached spawn + unref；PID 复用防御（ps 校验）
   manager.js         #   状态机 stopped→starting→running/error；watchdog；自动重连；adopt 接管
   prompt.js          #   密码/passphrase 提示词探测（setsid 无 tty → stdin 写密码）
@@ -24,6 +28,7 @@ engine/              # 纯 Node 层：ssh 参数/spawn/状态机/日志/端口/a
   platform.js        #   macOS 实现 / Windows 预留
 js/                  # 页面层（独占 utools API 与持久化）
 css/ vendor/ assets/
+test/                # smoke-v2.js（引擎冒烟）/ e2e-v2.js（真实 sshd 端到端，临时高端口 sshd 自动清理）
 ```
 
 ## 本地开发与载入
@@ -43,6 +48,16 @@ css/ vendor/ assets/
 - **日志**：每隧道独立日志文件，uTools 退出期间也保留。
 - **安全**：密码与 passphrase 存 `utools.dbCryptoStorage`（加密、不导出、不云同步）；秘密只经内存进子进程 stdin。
 - **导入/导出**：JSON（不含密码）。
+- **`~/.ssh/config` 导入（v2.0）**：工具栏「从 ~/.ssh/config 导入」——仅含转发指令
+  （LocalForward/RemoteForward/DynamicForward）的 Host 进草稿，勾选批量生成隧道；
+  通配符 Host 与 Match 块跳过、Include 仅提示；HostName/Port/User/IdentityFile/ProxyJump
+  直接映射现有数据模型；`RemoteForward 0.0.0.0:` 自动置 LAN 开关。不写入任何秘密。
+- **反向转发 LAN 开关（v2.0）**：每条 -R 规则可开「允许远端局域网访问」（远端绑 0.0.0.0，
+  默认仅 127.0.0.1）。**安全须知**：仅当远端 sshd 配置 `GatewayPorts yes|clientspecified`
+  时实际生效，否则服务端静默降级为仅监听回环；开启前请确认远端防火墙/安全组。
+- **日志全文检索（v2.0）**：工具栏「日志全文检索」——跨隧道搜索
+  `~/.utools-ssh-tunnel/logs/*.log`，按隧道分组、命中行 ± 上下文、关键词高亮、
+  大小写开关、可跳转对应日志视图（返回仍回检索页）；已删隧道的遗留日志同样可检索。
 
 ## 端到端验证（macOS 本机 sshd）
 
@@ -68,6 +83,17 @@ lsof -nP -iTCP:18080 -sTCP:LISTEN         # 监听者应为 ssh
 
 其余用例（SOCKS、反向、密码/agent 认证、端口冲突、外部 kill、主题）见 `docs/PRD.md` 验收矩阵。
 
+### 自动化测试
+
+```bash
+node test/smoke-v2.js   # 引擎冒烟：ssh-config 解析 18 边界 / bindAll 参数 / 日志检索（23 项）
+node test/e2e-v2.js     # 真实 sshd e2e：临时 sshd :2222 + http :18000，自动清理（9 项）
+```
+
+e2e 覆盖：bindAll 关仅回环 / 开 + `GatewayPorts clientspecified` 绑 wildcard 且 LAN 可达 /
+开 + GatewayPorts 缺省静默降级回环 / -R 远端端口占用 error(remoteport) / L·R·D 连通 /
+检索与 `grep -n` 对照。不碰系统 22 端口与 `/etc/ssh/sshd_config`。
+
 ## 已知限制（v1）
 
 - macOS 为主；Windows/Linux 代码预留未验证。
@@ -81,6 +107,10 @@ lsof -nP -iTCP:18080 -sTCP:LISTEN         # 监听者应为 ssh
 不带 docs/设计稿与仓库元数据。uTools 开发者工具「发布新版 / 打包离线安装包」时选择 `dist/` 目录。
 `dist/` 不入库（见 .gitignore）；改代码后重新 `./build.sh` 再发布。
 
-## v2 备选
+## 版本记录
 
-从 `~/.ssh/config` 批量导入、隧道分组、连接历史、流量统计、日志全文检索。
+- **v2.0（0.2.0，2026-09-06）**：`~/.ssh/config` 批量导入、反向转发 LAN 绑定开关、跨隧道日志全文检索；
+  空状态重构（双 CTA + 类型标签）；信息密度优化（统计卡片化/标签化/明细折叠）。
+- **v1（0.1.0）**：三类型转发、常驻接管、动态指令、主题三态、加密秘密存储、导入导出。
+
+后续备选（隧道分组、连接历史、流量统计、离线断线自愈、常驻实时日志）见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。

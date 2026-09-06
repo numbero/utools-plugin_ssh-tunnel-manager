@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpanTunnel · v2.0 UI 设计稿</title>
+<style>
+  /* ============ 主题令牌（与插件 css/style.css 同源） ============ */
+  :root{
+    --bg:#e9eaee; --bg-accent:#dfe2e9;
+    --win-bg:#f5f5f7;
+    --surface:#ffffff; --surface-2:#f2f3f5; --surface-3:#e4e5e9;
+    --border:rgba(60,60,67,.12); --border-strong:rgba(60,60,67,.22);
+    --text:#1d1d1f; --text-2:#57575c; --text-3:#8a8a8f;
+    --accent:#007aff; --accent-press:#0064d1; --on-accent:#ffffff;
+    --green:#28a745; --green-strong:#1f8f3a; --green-bg:rgba(52,199,89,.14);
+    --amber:#b96b00; --amber-bg:rgba(255,159,10,.16);
+    --red:#d70015;   --red-bg:rgba(255,59,48,.12);
+    --grey:#6f6f74;  --grey-bg:rgba(142,142,147,.16);
+    --shadow:0 24px 60px rgba(20,22,30,.20), 0 4px 16px rgba(20,22,30,.12);
+    --mono:"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  }
+  :root[data-theme="dark"]{
+    --bg:#111114; --bg-accent:#17171c;
+    --win-bg:#1c1c1e;
+    --surface:#262629; --surface-2:#2e2e32; --surface-3:#3a3a3f;
+    --border:rgba(255,255,255,.10); --border-strong:rgba(255,255,255,.22);
+    --text:#f5f5f7; --text-2:#b4b4ba; --text-3:#84848a;
+    --accent:#0a84ff; --accent-press:#3395ff; --on-accent:#ffffff;
+    --green:#30d158; --green-strong:#30d158; --green-bg:rgba(48,209,88,.16);
+    --amber:#ff9f0a; --amber-bg:rgba(255,159,10,.15);
+    --red:#ff453a;   --red-bg:rgba(255,69,58,.16);
+    --grey:#98989d;  --grey-bg:rgba(152,152,157,.16);
+    --shadow:0 24px 60px rgba(0,0,0,.55), 0 4px 16px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);color:var(--text);-webkit-font-smoothing:antialiased;
+    background:radial-gradient(1100px 640px at 72% -10%, var(--bg-accent), transparent 60%), var(--bg);
+    padding:28px 20px 60px}
+  .board{max-width:860px;margin:0 auto}
+  .board-head{display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+  .board-head h1{font-size:19px;font-weight:700}
+  .board-head .sub{font-size:12.5px;color:var(--text-3)}
+  .board-head .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .seg{display:flex;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:2px}
+  .seg button{border:0;background:transparent;color:var(--text-2);font-family:inherit;font-size:12.5px;
+    padding:6px 13px;border-radius:7px;cursor:pointer;font-weight:500;white-space:nowrap}
+  .seg button.on{background:var(--surface);color:var(--accent);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+  .note{font-size:12px;color:var(--text-3);line-height:1.7;margin:6px 2px 16px;max-width:760px}
+  .note b{color:var(--text-2)}
+
+  /* 模拟 uTools 窗口 */
+  .win{width:760px;max-width:100%;background:var(--win-bg);border:1px solid var(--border-strong);
+    border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:0 auto}
+  .screen{display:none}
+  .screen.on{display:block}
+
+  /* ============ 以下组件样式与插件 css/style.css 同源 ============ */
+  .toolbar{display:flex;align-items:center;gap:7px;padding:10px 12px;border-bottom:1px solid var(--border)}
+  .search{flex:1;display:flex;align-items:center;gap:7px;background:var(--surface);
+    border:1px solid var(--border);border-radius:8px;padding:0 10px;height:32px;min-width:100px}
+  .search svg{flex:none;opacity:.5}
+  .search input{border:0;outline:0;background:transparent;flex:1;font-family:inherit;font-size:13px;color:var(--text)}
+  .search input::placeholder{color:var(--text-3)}
+  .btn{display:inline-flex;align-items:center;gap:5px;border-radius:8px;cursor:pointer;
+    font-family:inherit;font-size:13px;font-weight:500;padding:0 12px;height:32px;
+    border:1px solid var(--border);background:var(--surface);color:var(--text);white-space:nowrap}
+  .btn:hover{filter:brightness(.97)}
+  .btn.primary{background:var(--accent);border-color:transparent;color:var(--on-accent);font-weight:600}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--text-2)}
+  .btn.sm{height:28px;padding:0 10px;font-size:12px;border-radius:7px}
+  .divider{width:1px;height:20px;background:var(--border-strong);margin:0 1px;flex:none}
+  .icon-btn{width:26px;height:26px;border-radius:7px;border:1px solid var(--border);
+    background:var(--surface);color:var(--text-2);cursor:pointer;display:inline-flex;
+    align-items:center;justify-content:center;flex:none}
+  .icon-btn:hover{background:var(--surface-2)}
+  .icon-btn svg{width:13px;height:13px}
+  .icon-btn.spot{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 3px rgba(10,132,255,.18)}
+  .panel{position:relative;min-height:520px}
+  .view{padding:10px 12px 18px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:11px;margin-bottom:9px;position:relative}
+  .card.running{border-left:3px solid var(--green)}
+  .card.stopped{border-left:3px solid var(--grey-bg)}
+  .card-head{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:11px}
+  .status-dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--grey)}
+  .card.running .status-dot{background:var(--green)}
+  .card-id{flex:1;min-width:0}
+  .card-name{font-size:13.5px;font-weight:600}
+  .card-sub{font-family:var(--mono);font-size:11.5px;color:var(--text-3);margin-top:2px}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
+    padding:2px 9px;border-radius:20px;flex:none}
+  .chip .up{font-weight:500;font-family:var(--mono);font-size:10.5px;opacity:.75}
+  .chip.running{background:var(--green-bg);color:var(--green-strong)}
+  .chip.stopped{background:var(--grey-bg);color:var(--grey)}
+  .rules{padding:9px 12px 3px}
+  .rules-title{font-size:11px;color:var(--text-3);letter-spacing:.5px;margin-bottom:6px;font-weight:600}
+  .rule{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;
+    background:var(--surface-2);margin-bottom:6px;font-family:var(--mono);font-size:11.5px}
+  .rchip{font-family:var(--sans);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px;flex:none;letter-spacing:.3px}
+  .rchip.L{background:rgba(10,132,255,.14);color:var(--accent)}
+  .rchip.R{background:rgba(94,92,230,.14);color:#7a78f0}
+  .rchip.D{background:rgba(191,90,242,.14);color:#c45cf0}
+  .rule .map{color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sw{position:relative;width:30px;height:18px;flex:none;cursor:pointer;display:inline-block}
+  .sw input{display:none}
+  .sw .tr{position:absolute;inset:0;background:var(--surface-3);border-radius:20px;transition:background .15s}
+  .sw .kn{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s}
+  .sw input:checked + .tr{background:var(--green)}
+  .sw input:checked + .tr + .kn{left:14px}
+  .card-foot{display:flex;align-items:center;gap:7px;padding:9px 12px 12px;border-top:1px solid var(--border)}
+  .card-foot .spacer{flex:1}
+  .card-body{border-top:1px solid var(--border)}
+  .section{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:13px;margin-bottom:10px}
+  .section h3{font-size:12.5px;font-weight:700;letter-spacing:.4px;color:var(--text-2);margin-bottom:11px;display:flex;align-items:center;gap:6px}
+  .form-head{display:flex;align-items:center;gap:10px;padding-bottom:12px}
+  .form-head h2{font-size:16px;font-weight:650;flex:1}
+  .rule-edit{display:grid;grid-template-columns:96px 1fr 1fr 1fr 34px 26px;gap:8px;align-items:center;
+    background:var(--surface-2);border-radius:9px;padding:9px}
+  .rule-edit select,.rule-edit input{height:30px;border:1px solid var(--border);border-radius:7px;
+    background:var(--win-bg);color:var(--text);font-family:var(--mono);font-size:12px;padding:0 8px;width:100%;outline:none}
+  .rule-edit select{font-family:var(--sans)}
+  .icon-btn.danger:hover{background:var(--red-bg);color:var(--red)}
+  .modal-mask{position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:50;
+    display:flex;align-items:center;justify-content:center;padding:16px}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:13px;
+    padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  .modal .row{display:flex;justify-content:flex-end;gap:8px}
+  .logbox{background:#0e0f12;color:#c8ccd4;border-radius:10px;padding:12px 14px;
+    font-family:var(--mono);font-size:11.5px;line-height:1.7;white-space:pre-wrap;word-break:break-all}
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:40px 20px;color:var(--text-3);text-align:center;gap:10px}
+  .empty b{color:var(--text);font-size:14px}
+  .empty span{font-size:12px;max-width:300px;line-height:1.7}
+
+  /* ============ v2.0 新增样式（实现时并入 css/style.css） ============ */
+  .chip.warn{background:var(--amber-bg);color:var(--amber)}
+
+  /* 功能 B：规则子行 */
+  .rule-wrap{margin-bottom:8px}
+  .rule-wrap .rule-edit{margin-bottom:0}
+  .rule-sub{background:var(--surface-2);border:1px dashed var(--border-strong);border-top:0;
+    border-radius:0 0 9px 9px;padding:8px 11px;display:flex;align-items:flex-start;gap:9px;flex-wrap:wrap}
+  .rule-sub .sw{margin-top:1px}
+  .rule-sub .lbl{font-size:12px;color:var(--text-2);font-weight:500}
+  .rule-sub .lbl b{color:var(--text)}
+  .hint.warn{width:100%;background:var(--amber-bg);color:var(--amber);border-radius:8px;
+    padding:8px 11px;font-size:11.5px;line-height:1.7;margin-top:2px}
+
+  /* 信息密度原则：统计用数字卡片、明细用标签、长文本默认折叠 */
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:9px}
+  .stat{background:var(--surface-2);border:1px solid var(--border);border-radius:9px;
+    padding:8px 10px;display:flex;flex-direction:column;gap:1px}
+  .stat b{font-size:17px;font-weight:700;font-family:var(--mono);line-height:1.15}
+  .stat span{font-size:10.5px;color:var(--text-3);font-weight:500}
+  .stat.ok b{color:var(--green)} .stat.warn b{color:var(--amber)} .stat.err b{color:var(--red)}
+  .tagrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .rtag{font-family:var(--mono);font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:6px}
+  .rtag.L{background:rgba(10,132,255,.14);color:var(--accent)}
+  .rtag.R{background:rgba(94,92,230,.14);color:#7a78f0}
+  .rtag.D{background:rgba(191,90,242,.14);color:#c45cf0}
+  .rtag.j{background:var(--grey-bg);color:var(--text-2);font-family:var(--sans)}
+  details.det{margin-bottom:10px}
+  details.det summary{cursor:pointer;font-size:11.5px;color:var(--text-3);padding:2px 1px;user-select:none}
+  details.det summary:hover{color:var(--text-2)}
+  details.det .tagrow{margin-top:7px}
+
+  /* 功能 A：导入模态 */
+  .modal.wide{width:560px;max-width:100%;max-height:100%;overflow:auto}
+  .modal.wide h4{font-size:14.5px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .import-path{font-family:var(--mono);font-size:11.5px;color:var(--text-3);margin-bottom:10px}
+  .import-list{border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:12px}
+  .import-row{display:flex;align-items:center;gap:9px;padding:9px 11px;border-bottom:1px solid var(--border);cursor:pointer}
+  .import-row:last-child{border-bottom:0}
+  .import-row:hover{background:var(--surface-2)}
+  .import-row.head{background:var(--surface-2);font-size:11px;color:var(--text-3);font-weight:600;cursor:default;padding:6px 11px}
+  .import-row input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);flex:none;cursor:pointer}
+  .import-id{flex:1;min-width:0}
+  .import-name{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .import-conn{font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:2px}
+  .import-rules{font-family:var(--mono);font-size:11px;color:var(--text-2);margin-top:3px;line-height:1.6}
+  .import-line{font-family:var(--mono);font-size:10.5px;color:var(--text-3);flex:none}
+  .badge{font-family:var(--sans);font-size:10px;font-weight:600;padding:1px 7px;border-radius:20px;flex:none}
+  .badge.warn{background:var(--amber-bg);color:var(--amber)}
+  .badge.err{background:var(--red-bg);color:var(--red)}
+  .badge.grey{background:var(--grey-bg);color:var(--grey)}
+
+  /* 功能 C：检索视图 */
+  .search-head{display:flex;align-items:center;gap:8px;padding-bottom:10px}
+  .search-head .q{flex:1;display:flex;align-items:center;gap:7px;background:var(--surface);
+    border:1px solid var(--border);border-radius:8px;padding:0 10px;height:32px}
+  .search-head .q input{border:0;outline:0;background:transparent;flex:1;font-family:var(--mono);font-size:12.5px;color:var(--text)}
+  .aa{font-size:11px;font-weight:700;color:var(--text-3);border:1px solid var(--border);border-radius:6px;
+    padding:2px 6px;cursor:pointer;background:var(--surface-2);flex:none;user-select:none}
+  .aa.on{color:var(--accent);border-color:var(--accent);background:rgba(10,132,255,.1)}
+  .search-sum{font-size:12px;color:var(--text-3);padding:0 2px 9px}
+  .search-sum b{color:var(--text)}
+  .sres-group{background:var(--surface);border:1px solid var(--border);border-radius:11px;margin-bottom:9px;overflow:hidden}
+  .sres-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border)}
+  .sres-head b{font-size:13px}
+  .sres-head .id{font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
+  .sres-head .right{margin-left:auto;display:flex;gap:7px;align-items:center}
+  .sres-hit{padding:8px 12px;border-bottom:1px solid var(--border)}
+  .sres-hit:last-child{border-bottom:0}
+  .sres-ctx{background:#0e0f12;border-radius:8px;padding:8px 11px;font-family:var(--mono);
+    font-size:11px;line-height:1.75;color:#7d828c;overflow-x:auto;white-space:pre}
+  .sres-ctx .hitline{color:#e6e8ee;background:rgba(255,214,10,.10);display:block;margin:0 -11px;padding:0 11px}
+  .sres-ctx .ln{display:inline-block;min-width:34px;color:#565b66;text-align:right;margin-right:10px;user-select:none}
+  mark{background:rgba(255,214,10,.28);color:inherit;border-radius:3px;padding:0 1px}
+  .sres-ctx mark{background:rgba(255,214,10,.35);color:#ffd60a}
+</style>
+</head>
+<body>
+<div class="board">
+
+  <div class="board-head">
+    <h1>SpanTunnel · v2.0 UI 设计稿</h1>
+    <span class="sub">闸门 M1 · 三屏新增界面 · 配套 <b>DESIGN-v2.md</b></span>
+    <span class="right">
+      <span class="seg" id="themeSeg">
+        <button data-t="light">浅色</button>
+        <button data-t="dark" class="on">深色</button>
+      </span>
+    </span>
+  </div>
+  <div class="seg" id="screenSeg" style="margin-bottom:4px;width:max-content">
+    <button data-s="s1" class="on">① 从 ~/.ssh/config 导入</button>
+    <button data-s="s2">② 反向转发 LAN 开关</button>
+    <button data-s="s3">③ 日志全文检索</button>
+  </div>
+  <div class="note" id="note"></div>
+
+  <div class="win">
+
+    <!-- ============ 屏 1：导入模态 ============ -->
+    <div class="screen on" id="s1">
+      <div class="toolbar">
+        <div class="search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input placeholder="搜索隧道名称或主机…">
+        </div>
+        <button class="btn ghost sm">▶ 全部启动</button>
+        <button class="btn ghost sm">■ 全部停止</button>
+        <button class="icon-btn spot" title="从 ~/.ssh/config 导入（新增入口）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h7"/><path d="m17 15 3 3-3 3" transform="translate(0,-3)"/></svg></button>
+        <button class="icon-btn" title="导入配置 JSON"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg></button>
+        <button class="icon-btn" title="导出配置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V9m0 0 4 4m-4-4-4 4M4 3h16"/></svg></button>
+        <button class="icon-btn" title="日志检索（新增入口）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4z"/><path d="m10 12 2 2 4-4"/></svg></button>
+        <div class="divider"></div>
+        <button class="btn primary">＋ 新建隧道</button>
+      </div>
+      <div class="panel">
+        <div class="view" style="filter:blur(0);opacity:.55;pointer-events:none">
+          <div class="card running"><div class="card-head"><span class="status-dot"></span>
+            <div class="card-id"><div class="card-name">公司跳板机</div><div class="card-sub">deploy@bastion.corp.com:2222 · 2 条启用规则</div></div>
+            <span class="chip running">运行中<span class="up">3 小时 12 分</span></span></div></div>
+          <div class="card stopped"><div class="card-head"><span class="status-dot"></span>
+            <div class="card-id"><div class="card-name">gpu-box</div><div class="card-sub">numbero@10.0.3.21:22 · 1 条启用规则</div></div>
+            <span class="chip stopped">已停止</span></div></div>
+        </div>
+
+        <!-- 导入模态 -->
+        <div class="modal-mask">
+          <div class="modal wide">
+            <h4>从 ~/.ssh/config 导入隧道
+              <span class="badge grey">一次性 · 勾选导入</span></h4>
+            <div class="import-path">~/.ssh/config · 解析出 9 个 Host 块</div>
+
+            <div class="stat-grid">
+              <div class="stat ok"><b>4</b><span>可导入</span></div>
+              <div class="stat"><b>8</b><span>跳过</span></div>
+              <div class="stat warn"><b>1</b><span>Include 未解析</span></div>
+              <div class="stat err"><b>1</b><span>解析告警</span></div>
+            </div>
+            <details class="det">
+              <summary>跳过 / 告警明细</summary>
+              <div class="tagrow">
+                <span class="badge grey">通配符 Host * · dev-*</span>
+                <span class="badge grey">Match 块 ×1</span>
+                <span class="badge grey">无转发项 ×5</span>
+                <span class="badge warn">Include ~/.ssh/conf.d/work（不跟进）</span>
+                <span class="badge err">L102 LocalForward 8080 缺目标，已忽略</span>
+              </div>
+            </details>
+
+            <div class="import-list">
+              <div class="import-row head">
+                <input type="checkbox" id="ckAll" checked><span>全选</span>
+                <span style="margin-left:auto">来源行号</span>
+              </div>
+
+              <label class="import-row">
+                <input type="checkbox" class="ck" checked>
+                <div class="import-id">
+                  <div class="import-name">bastion <span class="badge warn">疑似已存在</span></div>
+                  <div class="import-conn">deploy@bastion.corp.com:2222</div>
+                  <div class="tagrow" style="margin-top:4px">
+                    <span class="rtag R">R :9000 · LAN</span>
+                    <span class="rtag L">L 18080</span>
+                    <span class="rtag j">密钥</span>
+                  </div>
+                </div>
+                <span class="import-line">L34</span>
+              </label>
+
+              <label class="import-row">
+                <input type="checkbox" class="ck" checked>
+                <div class="import-id">
+                  <div class="import-name">gpu-box</div>
+                  <div class="import-conn">numbero@10.0.3.21:22</div>
+                  <div class="tagrow" style="margin-top:4px">
+                    <span class="rtag D">D 11080</span>
+                    <span class="rtag j">-J bastion</span>
+                    <span class="rtag j">agent</span>
+                  </div>
+                </div>
+                <span class="import-line">L58</span>
+              </label>
+
+              <label class="import-row">
+                <input type="checkbox" class="ck" checked>
+                <div class="import-id">
+                  <div class="import-name">web-dev <span class="badge err">私钥缺失</span></div>
+                  <div class="import-conn">dev@web-dev.internal:22</div>
+                  <div class="tagrow" style="margin-top:4px">
+                    <span class="rtag L">L 8080</span>
+                    <span class="rtag j">密钥</span>
+                  </div>
+                </div>
+                <span class="import-line">L72</span>
+              </label>
+
+              <label class="import-row">
+                <input type="checkbox" class="ck">
+                <div class="import-id">
+                  <div class="import-name">staging <span class="badge warn">端口冲突</span></div>
+                  <div class="import-conn">ops@staging.corp.com:22</div>
+                  <div class="tagrow" style="margin-top:4px">
+                    <span class="rtag L">L 18080</span>
+                    <span class="rtag j">agent</span>
+                  </div>
+                </div>
+                <span class="import-line">L91</span>
+              </label>
+            </div>
+
+            <div class="row">
+              <button class="btn sm">取消</button>
+              <button class="btn sm primary" id="importBtn">导入所选（3）</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 屏 2：表单 R 规则子行 + 列表 LAN 徽标 ============ -->
+    <div class="screen" id="s2">
+      <div class="panel"><div class="view">
+        <div class="form-head">
+          <button class="btn ghost sm">← 返回</button>
+          <h2>编辑隧道 · 公司跳板机</h2>
+        </div>
+
+        <div class="section">
+          <h3>转发规则 <span style="font-weight:400;color:var(--text-3)">（一个隧道可多条）</span></h3>
+
+          <div class="rule-wrap" style="margin-bottom:8px">
+            <div class="rule-edit">
+              <select><option>本地转发</option></select>
+              <input value="18080"><input value="127.0.0.1"><input value="8000">
+              <label class="sw"><input type="checkbox" checked><span class="tr"></span><span class="kn"></span></label>
+              <button class="icon-btn danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            </div>
+          </div>
+
+          <!-- R 规则：新增子行（LAN 开关 + 风险提示） -->
+          <div class="rule-wrap">
+            <div class="rule-edit">
+              <select><option>反向转发</option></select>
+              <input value="9000" placeholder="远端监听端口"><input value="127.0.0.1"><input value="9000">
+              <label class="sw"><input type="checkbox" checked><span class="tr"></span><span class="kn"></span></label>
+              <button class="icon-btn danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            </div>
+            <div class="rule-sub">
+              <label class="sw"><input type="checkbox" id="bindAllCk" checked><span class="tr"></span><span class="kn"></span></label>
+              <span class="lbl"><b>允许远端局域网访问</b>（远端绑 0.0.0.0，默认仅 127.0.0.1）</span>
+              <div class="hint warn" id="bindAllWarn">
+                ⚠ 远端端口对远端网络内所有主机可见<br>
+                ⚠ 需远端 sshd 开启 GatewayPorts 才生效，否则静默降级 127.0.0.1<br>
+                ⚠ 请先确认远端防火墙 / 安全组
+              </div>
+            </div>
+          </div>
+
+          <div class="rule-wrap" style="margin-top:8px">
+            <div class="rule-edit">
+              <select><option>动态 SOCKS</option></select>
+              <input value="11080"><input disabled placeholder="（无需目标）" style="opacity:.45"><input disabled placeholder="—" style="opacity:.45">
+              <label class="sw"><input type="checkbox" checked><span class="tr"></span><span class="kn"></span></label>
+              <button class="icon-btn danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            </div>
+          </div>
+          <button class="btn sm" style="margin-top:8px">＋ 添加规则</button>
+        </div>
+
+        <!-- 保存后列表视图的呈现 -->
+        <div style="font-size:11px;color:var(--text-3);letter-spacing:.5px;font-weight:600;margin:14px 2px 8px">保存后 · 列表视图呈现</div>
+        <div class="card running">
+          <div class="card-head"><span class="status-dot"></span>
+            <div class="card-id"><div class="card-name">公司跳板机</div><div class="card-sub">deploy@bastion.corp.com:2222 · 3 条启用规则</div></div>
+            <span class="chip running">运行中<span class="up">3 小时 12 分</span></span></div>
+          <div class="card-body"><div class="rules">
+            <div class="rules-title">转发规则 · 3 条</div>
+            <div class="rule"><span class="rchip L">本地</span><span class="map">18080 → 127.0.0.1:8000</span>
+              <label class="sw"><input type="checkbox" checked><span class="tr"></span><span class="kn"></span></label></div>
+            <div class="rule"><span class="rchip R">反向</span><span class="map">远端 :9000 → 127.0.0.1:9000 · LAN</span>
+              <span class="chip warn">LAN</span>
+              <label class="sw"><input type="checkbox" checked><span class="tr"></span><span class="kn"></span></label></div>
+            <div class="rule"><span class="rchip D">动态</span><span class="map">11080（SOCKS5）</span>
+              <label class="sw"><input type="checkbox" checked><span class="tr"></span><span class="kn"></span></label></div>
+          </div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============ 屏 3：日志全文检索 ============ -->
+    <div class="screen" id="s3">
+      <div class="panel"><div class="view">
+        <div class="search-head">
+          <button class="btn ghost sm">← 返回</button>
+          <div class="q">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:.5;flex:none"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input value="denied" placeholder="搜索全部隧道日志…（回车即搜）">
+            <span class="aa" id="aaBtn" title="区分大小写">Aa</span>
+          </div>
+          <button class="btn sm primary">搜索</button>
+        </div>
+        <div class="search-sum tagrow">
+          <span class="chip warn">3 处命中</span>
+          <span class="badge grey">2 个文件</span>
+          <span class="badge grey">扫描 8</span>
+          <span class="badge grey">23 ms</span>
+          <span class="rtag j">denied</span>
+        </div>
+
+        <div class="sres-group">
+          <div class="sres-head">
+            <b>公司跳板机</b><span class="id">tunnel_x8k2m9</span>
+            <span class="chip stopped" style="background:var(--grey-bg)">2 处命中</span>
+            <span class="right"><button class="btn sm ghost">查看日志 →</button></span>
+          </div>
+          <div class="sres-hit">
+            <div class="sres-ctx"><span class="ln">141</span>debug1: Next authentication method: password
+<span class="hitline"><span class="ln">142</span>deploy@bastion.corp.com's password: Permission <mark>denied</mark>, please try again.</span>
+<span class="ln">143</span>debug1: Authentications that can continue: publickey,password</div>
+          </div>
+          <div class="sres-hit">
+            <div class="sres-ctx"><span class="ln">158</span>debug1: No more authentication methods to try.
+<span class="hitline"><span class="ln">159</span>deploy@bastion.corp.com: Permission <mark>denied</mark> (publickey,password).</span>
+<span class="ln">160</span>—— 进程退出（exit 255）——</div>
+          </div>
+        </div>
+
+        <div class="sres-group">
+          <div class="sres-head">
+            <b style="color:var(--text-3)">（隧道已删除）</b><span class="id">tunnel_m3k2p7</span>
+            <span class="chip stopped" style="background:var(--grey-bg)">1 处命中</span>
+            <span class="chip warn">已达 50 条上限，截断</span>
+            <span class="right"><button class="btn sm ghost">查看日志 →</button></span>
+          </div>
+          <div class="sres-hit">
+            <div class="sres-ctx"><span class="ln">7</span>debug1: Connecting to 10.0.3.21 port 22.
+<span class="hitline"><span class="ln">8</span>numbero@10.0.3.21: Permission <mark>denied</mark> (publickey).</span>
+<span class="ln">9</span>—— 进程退出（exit 255）——</div>
+          </div>
+        </div>
+
+        <div class="empty" style="padding:22px">
+          <b>空态示意</b>
+          <span>没有命中「denied」的日志。换个关键词，或先启动几条隧道产生日志。</span>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // 主题切换
+  var themeSeg = document.getElementById('themeSeg');
+  themeSeg.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    document.documentElement.setAttribute('data-theme', b.dataset.t);
+    Array.prototype.forEach.call(themeSeg.children, function (x) { x.classList.toggle('on', x === b); });
+  });
+  // 屏幕切换
+  var notes = {
+    s1: '<b>屏 ①</b>：工具栏新增「从 ~/.ssh/config 导入」入口（高亮描边示意）。模态含解析摘要（可导入/跳过明细/Include/告警行）、勾选式草稿列表（徽标：疑似已存在·端口冲突·私钥缺失，均不阻断勾选）、来源行号。只导入含转发项的 Host；一次性导入，不做增量同步。',
+    s2: '<b>屏 ②</b>：表单规则行下方，type=反向转发 时渲染子行——「允许远端局域网访问」开关（默认关=仅绑 127.0.0.1）。开启时展示琥珀风险三要点（对远端网络可见 / 需远端 GatewayPorts 配合否则静默降级 / 确认防火墙策略）。保存后列表规则行追加 LAN 徽标。可点开关试试联动。',
+    s3: '<b>屏 ③</b>：工具栏「日志检索」入口 → 独立视图。关键词搜索全部隧道日志（~/.utools-ssh-tunnel/logs/*.log），按隧道分组、命中行 ± 1 行上下文、mark 高亮、行号可与 grep -n 对照；Aa 切换大小写敏感；组头可跳转对应日志视图（返回仍回检索页）；已删除隧道的遗留日志同样可检索；单文件命中达上限显示截断徽标。'
+  };
+  var screenSeg = document.getElementById('screenSeg');
+  function showScreen(id) {
+    Array.prototype.forEach.call(document.querySelectorAll('.screen'), function (s) { s.classList.toggle('on', s.id === id); });
+    Array.prototype.forEach.call(screenSeg.children, function (x) { x.classList.toggle('on', x.dataset.s === id); });
+    document.getElementById('note').innerHTML = notes[id];
+  }
+  screenSeg.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    showScreen(b.dataset.s);
+  });
+  showScreen('s1');
+
+  // 屏 1：全选 / 计数联动
+  var cks = Array.prototype.slice.call(document.querySelectorAll('.ck'));
+  var ckAll = document.getElementById('ckAll');
+  var importBtn = document.getElementById('importBtn');
+  function syncImport() {
+    var n = cks.filter(function (c) { return c.checked; }).length;
+    importBtn.textContent = '导入所选（' + n + '）';
+    ckAll.checked = n === cks.length;
+    ckAll.indeterminate = n > 0 && n < cks.length;
+  }
+  cks.forEach(function (c) { c.addEventListener('change', syncImport); });
+  ckAll.addEventListener('change', function () { cks.forEach(function (c) { c.checked = ckAll.checked; }); syncImport(); });
+  syncImport();
+
+  // 屏 2：bindAll 开关联动风险提示
+  var bindAllCk = document.getElementById('bindAllCk');
+  var bindAllWarn = document.getElementById('bindAllWarn');
+  bindAllCk.addEventListener('change', function () {
+    bindAllWarn.style.display = bindAllCk.checked ? '' : 'none';
+  });
+
+  // 屏 3：Aa 大小写 chip
+  var aaBtn = document.getElementById('aaBtn');
+  aaBtn.addEventListener('click', function () { aaBtn.classList.toggle('on'); });
+</script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+# SpanTunnel v2 smoke fixture —— 覆盖 DESIGN-v2.md §2.3 的 18 项边界
+# 全局区（首块之前）关键字被解析器忽略
+ForwardAgent yes
+
+Host *
+  StrictHostKeyChecking accept-new
+
+Host bastion bastion.corp.com
+  HostName bastion.corp.com
+  Port 2222
+  User deploy
+  IdentityFile ~/.ssh/id_work
+  IdentityFile ~/.ssh/id_work_backup
+  ProxyJump jump1.corp.com
+  LocalForward 18080 127.0.0.1:8000
+  RemoteForward 0.0.0.0:9000 127.0.0.1:9000
+  DynamicForward 11080
+
+Host gpu-box
+  hostname 10.0.3.21
+  DynamicForward 127.0.0.1:11081
+  ProxyJump bastion
+
+Host dev-*
+  User dev
+
+Match host internal.example.com
+  User matched
+
+Include ~/.ssh/conf.d/work
+
+host web-dev
+  HostName web-dev.internal
+  Port=2222
+  localforward 8080 127.0.0.1:80
+  HostName duplicate.ignored
+
+Host broken
+  LocalForward 8080
+  LocalForward [::1]:8081 ::1:80
+  DynamicForward 70000
+  LocalForward 99999x 127.0.0.1:80
+
+Host
+  User nobody
+
+Host dup
+  User a
+Host dup
+  User b
+  LocalForward 1234 127.0.0.1:5678

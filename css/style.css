@@ -179,8 +179,10 @@ input,textarea{user-select:text}
   padding:56px 20px;color:var(--text-3);text-align:center;gap:10px}
 .empty .big{width:54px;height:54px;border-radius:14px;background:var(--surface-2);
   display:flex;align-items:center;justify-content:center;color:var(--text-3)}
+.empty .big svg{width:26px;height:26px;display:block}
 .empty b{color:var(--text);font-size:14px}
 .empty span{font-size:12px;max-width:300px;line-height:1.7}
+.empty-actions{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:4px;flex-wrap:wrap}
 
 /* ============ 表单 ============ */
 .form-head{display:flex;align-items:center;gap:10px;padding-bottom:12px}
@@ -248,3 +250,78 @@ input,textarea{user-select:text}
 .spin{display:inline-block;width:11px;height:11px;border:2px solid currentColor;
   border-top-color:transparent;border-radius:50%;animation:rot .7s linear infinite;vertical-align:-1px}
 @keyframes rot{to{transform:rotate(360deg)}}
+
+/* ============ v2.0：统计卡 / 标签组 / 折叠明细 ============ */
+/* 信息密度原则：统计用数字卡或标签，明细默认折叠 */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:9px}
+.stat{background:var(--surface-2);border:1px solid var(--border);border-radius:9px;
+  padding:8px 10px;display:flex;flex-direction:column;gap:1px}
+.stat b{font-size:17px;font-weight:700;font-family:var(--mono);line-height:1.15}
+.stat span{font-size:10.5px;color:var(--text-3);font-weight:500}
+.stat.ok b{color:var(--green)} .stat.warn b{color:var(--amber)} .stat.err b{color:var(--red)}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rtag{font-family:var(--mono);font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:6px}
+.rtag.L{background:rgba(10,132,255,.14);color:var(--accent)}
+.rtag.R{background:rgba(94,92,230,.14);color:#7a78f0}
+.rtag.D{background:rgba(191,90,242,.14);color:#c45cf0}
+.rtag.j{background:var(--grey-bg);color:var(--text-2);font-family:var(--sans)}
+.badge{font-size:10px;font-weight:600;padding:1px 7px;border-radius:20px;flex:none}
+.badge.warn{background:var(--amber-bg);color:var(--amber)}
+.badge.err{background:var(--red-bg);color:var(--red)}
+.badge.grey{background:var(--grey-bg);color:var(--grey)}
+details.det{margin-bottom:10px}
+details.det summary{cursor:pointer;font-size:11.5px;color:var(--text-3);padding:2px 1px;user-select:none}
+details.det summary:hover{color:var(--text-2)}
+details.det .tagrow{margin-top:7px}
+
+/* ============ v2.0：反向转发 LAN 开关子行 ============ */
+.chip.warn{background:var(--amber-bg);color:var(--amber)}
+.rule-wrap{margin-bottom:8px}
+.rule-wrap .rule-edit{margin-bottom:0}
+.rule-sub{background:var(--surface-2);border:1px dashed var(--border-strong);border-top:0;
+  border-radius:0 0 9px 9px;padding:8px 11px;display:flex;align-items:flex-start;gap:9px;flex-wrap:wrap}
+.rule-sub .sw{margin-top:1px}
+.rule-sub .lbl{font-size:12px;color:var(--text-2);font-weight:500}
+.rule-sub .lbl b{color:var(--text)}
+.hint.warn{width:100%;background:var(--amber-bg);color:var(--amber);border-radius:8px;
+  padding:8px 11px;font-size:11.5px;line-height:1.7;margin-top:2px}
+
+/* ============ v2.0：ssh_config 导入模态 ============ */
+.modal.wide{width:560px;max-width:100%;max-height:100%;overflow:auto}
+.modal.wide h4{font-size:14.5px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.import-path{font-family:var(--mono);font-size:11.5px;color:var(--text-3);margin-bottom:10px}
+.import-list{border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:12px}
+.import-row{display:flex;align-items:center;gap:9px;padding:9px 11px;border-bottom:1px solid var(--border);cursor:pointer}
+.import-row:last-child{border-bottom:0}
+.import-row:hover{background:var(--surface-2)}
+.import-row.head{background:var(--surface-2);font-size:11px;color:var(--text-3);font-weight:600;cursor:default;padding:6px 11px}
+.import-row input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);flex:none;cursor:pointer}
+.import-id{flex:1;min-width:0}
+.import-name{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.import-conn{font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:2px}
+.import-line{font-family:var(--mono);font-size:10.5px;color:var(--text-3);flex:none}
+
+/* ============ v2.0：日志全文检索视图 ============ */
+.search-head{display:flex;align-items:center;gap:8px;padding-bottom:10px}
+.search-head .q{flex:1;display:flex;align-items:center;gap:7px;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:0 10px;height:32px}
+.search-head .q svg{flex:none;opacity:.5}
+.search-head .q input{border:0;outline:0;background:transparent;flex:1;font-family:var(--mono);font-size:12.5px;color:var(--text)}
+.search-head .q input::placeholder{color:var(--text-3);font-family:var(--sans)}
+.aa{font-size:11px;font-weight:700;color:var(--text-3);border:1px solid var(--border);border-radius:6px;
+  padding:2px 6px;cursor:pointer;background:var(--surface-2);flex:none;user-select:none}
+.aa.on{color:var(--accent);border-color:var(--accent);background:rgba(10,132,255,.1)}
+.search-sum{padding:0 2px 9px}
+.sres-group{background:var(--surface);border:1px solid var(--border);border-radius:11px;margin-bottom:9px;overflow:hidden}
+.sres-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border)}
+.sres-head b{font-size:13px}
+.sres-head .id{font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
+.sres-head .right{margin-left:auto;display:flex;gap:7px;align-items:center}
+.sres-hit{padding:8px 12px;border-bottom:1px solid var(--border)}
+.sres-hit:last-child{border-bottom:0}
+.sres-ctx{background:#0e0f12;border-radius:8px;padding:8px 11px;font-family:var(--mono);
+  font-size:11px;line-height:1.75;color:#7d828c;overflow-x:auto;white-space:pre}
+.sres-ctx .ln{display:inline-block;min-width:34px;color:#565b66;text-align:right;margin-right:10px;user-select:none}
+.sres-ctx .hitline{color:#e6e8ee;background:rgba(255,214,10,.10);display:block;margin:0 -11px;padding:0 11px}
+mark{background:rgba(255,214,10,.28);color:inherit;border-radius:3px;padding:0 1px}
+.sres-ctx mark{background:rgba(255,214,10,.35);color:#ffd60a}

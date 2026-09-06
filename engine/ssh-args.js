@@ -22,8 +22,10 @@ function ruleToArgs(rule, bindHost) {
     return ['-L', bindHost + ':' + lp + ':' + rule.remoteHost + ':' + Number(rule.remotePort)];
   }
   if (rule.type === 'R') {
-    // 服务器侧仅绑定回环，避免意外暴露公网；如需 0.0.0.0 由远端 GatewayPorts 控制
-    return ['-R', '127.0.0.1:' + lp + ':' + rule.remoteHost + ':' + Number(rule.remotePort)];
+    // 默认服务器侧仅绑回环，避免意外暴露公网；
+    // bindAll 显式要求 0.0.0.0（需远端 sshd GatewayPorts 配合，否则服务端静默降回回环）
+    const rbind = rule.bindAll === true ? '0.0.0.0' : '127.0.0.1';
+    return ['-R', rbind + ':' + lp + ':' + rule.remoteHost + ':' + Number(rule.remotePort)];
   }
   if (rule.type === 'D') {
     return ['-D', bindHost + ':' + lp];

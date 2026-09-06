@@ -1,7 +1,7 @@
 {
   "pluginName": "SpanTunnel",
-  "description": "SpanTunnel · 管理本机 SSH 本地/反向/SOCKS 端口转发隧道：一键启停、后台常驻、状态可视",
-  "version": "0.1.0",
+  "description": "SpanTunnel · 管理本机 SSH 本地/反向/SOCKS 端口转发隧道：一键启停、后台常驻、状态可视、ssh_config 导入、日志检索",
+  "version": "0.2.0",
   "main": "index.html",
   "logo": "assets/logo.png",
   "preload": "preload.js",

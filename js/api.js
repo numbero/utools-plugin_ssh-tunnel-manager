@@ -84,6 +84,50 @@
       checkAgent: function () { return Promise.resolve({ ok: true, sock: '/tmp/preview-agent', identities: 2 }); },
       logTail: function () { return Promise.resolve(''); },
       logClear: function () { return Promise.resolve(); },
+      logFiles: function () { return Promise.resolve([]); },
+      logSearch: function (kw) {
+        return Promise.resolve({
+          keyword: kw, scanned: 2, elapsedMs: 3,
+          files: [{
+            id: 'tunnel_preview', file: '~/.utools-ssh-tunnel/logs/tunnel_preview.log', truncated: false,
+            hits: [{
+              lineNo: 12,
+              text: "debug1: Permission " + kw + ", please try again.",
+              before: ['debug1: Next authentication method: password'],
+              after: ['debug1: Authentications that can continue: publickey,password'],
+            }],
+          }],
+        });
+      },
+      parseSshConfig: function () {
+        return Promise.resolve({
+          ok: true, path: '~/.ssh/config',
+          result: {
+            defaultUser: 'preview',
+            entries: [
+              { kind: 'host', aliases: ['bastion'], wildcard: false, line: 3, hostName: 'bastion.corp.com', port: 2222, user: 'deploy',
+                identityFiles: ['~/.ssh/id_work'], proxyJump: '',
+                forwards: [
+                  { dir: 'R', bind: '0.0.0.0', port: 9000, targetHost: '127.0.0.1', targetPort: 9000, line: 8, raw: '' },
+                  { dir: 'L', bind: '', port: 18080, targetHost: '127.0.0.1', targetPort: 8000, line: 9, raw: '' },
+                ],
+                hasForward: true, skipReason: '' },
+              { kind: 'host', aliases: ['gpu-box'], wildcard: false, line: 12, hostName: '10.0.3.21', port: 22, user: '',
+                identityFiles: [], proxyJump: 'bastion',
+                forwards: [{ dir: 'D', bind: '', port: 11080, targetHost: '', targetPort: 0, line: 15, raw: '' }],
+                hasForward: true, skipReason: '' },
+              { kind: 'host', aliases: ['*'], wildcard: true, line: 20, hostName: '', port: 22, user: '',
+                identityFiles: [], proxyJump: '', forwards: [], hasForward: false, skipReason: 'wildcard' },
+              { kind: 'match', aliases: ['host', 'x'], wildcard: false, line: 24, hostName: '', port: 22, user: '',
+                identityFiles: [], proxyJump: '', forwards: [], hasForward: false, skipReason: 'match' },
+              { kind: 'host', aliases: ['plain'], wildcard: false, line: 27, hostName: 'plain.local', port: 22, user: 'u',
+                identityFiles: [], proxyJump: '', forwards: [], hasForward: false, skipReason: '' },
+            ],
+            includes: [{ path: '~/.ssh/conf.d/work', line: 30 }],
+            errors: [{ line: 33, text: 'LocalForward 8080' }],
+          },
+        });
+      },
       writeFile: function () { return Promise.resolve(); },
       readFile: function () { return Promise.resolve('{"app":"utools-ssh-tunnel-manager","version":1,"tunnels":[]}'); },
     };
